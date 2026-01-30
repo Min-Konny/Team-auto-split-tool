@@ -44,11 +44,14 @@ import {
   SimpleGrid,
   FormControl,
   FormLabel,
+  Card as ChakraCard,
+  CardBody,
+  CardHeader,
 } from '@chakra-ui/react'
-import { SearchIcon, AddIcon, EditIcon, CheckIcon, CloseIcon, DeleteIcon } from '@chakra-ui/icons'
-import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore'
+import { SearchIcon, AddIcon, EditIcon, CheckIcon, CloseIcon, DeleteIcon, TimeIcon } from '@chakra-ui/icons'
+import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { Player, GameRole, RANK_RATES, Rank } from '@/types'
+import { Player, GameRole, RANK_RATES, Rank, Match } from '@/types'
 import Layout from '@/components/Layout'
 import Card from '@/components/Card'
 import Link from 'next/link'
@@ -92,6 +95,11 @@ export default function Players() {
   const [showRankReference, setShowRankReference] = useState(false)
   const borderColor = useColorModeValue('gray.200', 'gray.700')
   const toast = useToast()
+
+  // 履歴モーダルの状態
+  const [historyModalPlayer, setHistoryModalPlayer] = useState<(Player & { id: string }) | null>(null)
+  const [playerMatches, setPlayerMatches] = useState<Array<Match & { playerTeam: 'BLUE' | 'RED', playerRole: string, isWinner: boolean }>>([])
+  const { isOpen: isHistoryModalOpen, onOpen: onHistoryModalOpen, onClose: onHistoryModalClose } = useDisclosure()
 
   const fetchPlayers = async () => {
     const querySnapshot = await getDocs(collection(db, 'players'))
@@ -474,6 +482,53 @@ export default function Players() {
     onEditModalClose()
   }
 
+  // 履歴モーダルを開く
+  const handleViewHistoryClick = async (player: Player & { id: string }) => {
+    setHistoryModalPlayer(player)
+    
+    try {
+      // 試合情報を取得
+      const matchesSnapshot = await getDocs(
+        query(collection(db, 'matches'), orderBy('date', 'desc'))
+      )
+      
+      // このプレイヤーが参加した試合をフィルタリング
+      const matches = matchesSnapshot.docs
+        .map((doc) => ({ id: doc.id, ...doc.data() } as Match))
+        .filter((match) => 
+          match.players.some((p) => p.playerId === player.id)
+        )
+        .map((match) => {
+          const playerInMatch = match.players.find((p) => p.playerId === player.id)!
+          return {
+            ...match,
+            playerTeam: playerInMatch.team,
+            playerRole: playerInMatch.role,
+            isWinner: playerInMatch.team === match.winner,
+          }
+        })
+      
+      setPlayerMatches(matches)
+      onHistoryModalOpen()
+    } catch (error) {
+      console.error('Error fetching match history:', error)
+      toast({
+        title: 'エラー',
+        description: '試合履歴の取得に失敗しました',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      })
+    }
+  }
+
+  // 履歴モーダルを閉じる
+  const handleCloseHistoryModal = () => {
+    setHistoryModalPlayer(null)
+    setPlayerMatches([])
+    onHistoryModalClose()
+  }
+
   // 利用可能なタグを取得
   const availableTags = Array.from(
     new Set(
@@ -816,6 +871,15 @@ export default function Players() {
                             <>
                               <Button
                                 size="sm"
+                                colorScheme="purple"
+                                onClick={() => handleViewHistoryClick(player)}
+                                leftIcon={<TimeIcon />}
+                                variant="outline"
+                              >
+                                履歴
+                              </Button>
+                              <Button
+                                size="sm"
                                 colorScheme="blue"
                                 onClick={() => handleEditPlayerClick(player)}
                                 leftIcon={<EditIcon />}
@@ -1091,6 +1155,136 @@ export default function Players() {
               <Button colorScheme="blue" onClick={handleSaveEditModal}>
                 保存
               </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
+        {/* 履歴表示モーダル */}
+        <Modal isOpen={isHistoryModalOpen} onClose={handleCloseHistoryModal} size="4xl" scrollBehavior="inside">
+          <ModalOverlay />
+          <ModalContent maxW="90vw" maxH="90vh">
+            <ModalHeader>
+              {historyModalPlayer?.nickname || historyModalPlayer?.name} の試合履歴
+            </ModalHeader>
+            <ModalCloseButton />
+            <ModalBody>
+              <VStack spacing={4} align="stretch">
+                {/* 統計情報 */}
+                <ChakraCard>
+                  <CardBody>
+                    <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4}>
+                      <Box textAlign="center">
+                        <Text fontSize="sm" color="gray.600">総試合数</Text>
+                        <Text fontSize="2xl" fontWeight="bold">
+                          {playerMatches.length}
+                        </Text>
+                      </Box>
+                      <Box textAlign="center">
+                        <Text fontSize="sm" color="gray.600">勝利数</Text>
+                        <Text fontSize="2xl" fontWeight="bold" color="green.500">
+                          {playerMatches.filter(m => m.isWinner).length}
+                        </Text>
+                      </Box>
+                      <Box textAlign="center">
+                        <Text fontSize="sm" color="gray.600">敗北数</Text>
+                        <Text fontSize="2xl" fontWeight="bold" color="red.500">
+                          {playerMatches.filter(m => !m.isWinner).length}
+                        </Text>
+                      </Box>
+                      <Box textAlign="center">
+                        <Text fontSize="sm" color="gray.600">勝率</Text>
+                        <Text fontSize="2xl" fontWeight="bold" color={playerMatches.length > 0 && (playerMatches.filter(m => m.isWinner).length / playerMatches.length) >= 0.5 ? 'green.500' : 'red.500'}>
+                          {playerMatches.length > 0
+                            ? Math.round((playerMatches.filter(m => m.isWinner).length / playerMatches.length) * 100)
+                            : 0}%
+                        </Text>
+                      </Box>
+                    </SimpleGrid>
+                  </CardBody>
+                </ChakraCard>
+
+                {/* 試合履歴リスト */}
+                {playerMatches.length === 0 ? (
+                  <Box textAlign="center" py={8}>
+                    <Text color="gray.500">試合履歴がありません</Text>
+                  </Box>
+                ) : (
+                  <Box overflowX="auto">
+                    <Table variant="simple" size="sm">
+                      <Thead>
+                        <Tr>
+                          <Th>日時</Th>
+                          <Th>チーム</Th>
+                          <Th>ロール</Th>
+                          <Th>結果</Th>
+                          <Th>勝者</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {playerMatches.map((match) => (
+                          <Tr key={match.id}>
+                            <Td>
+                              {new Date(match.date.seconds * 1000).toLocaleString('ja-JP')}
+                            </Td>
+                            <Td>
+                              <Badge
+                                colorScheme={match.playerTeam === 'BLUE' ? 'blue' : 'red'}
+                                fontSize="sm"
+                                px={2}
+                                py={1}
+                                borderRadius="full"
+                              >
+                                {match.playerTeam === 'BLUE' ? 'ブルーチーム' : 'レッドチーム'}
+                              </Badge>
+                            </Td>
+                            <Td>
+                              <Badge
+                                colorScheme={
+                                  match.playerRole === 'TOP' ? 'red' :
+                                  match.playerRole === 'JUNGLE' ? 'green' :
+                                  match.playerRole === 'MID' ? 'blue' :
+                                  match.playerRole === 'ADC' ? 'purple' : 'orange'
+                                }
+                                fontSize="sm"
+                                px={2}
+                                py={1}
+                                borderRadius="full"
+                              >
+                                {match.playerRole}
+                              </Badge>
+                            </Td>
+                            <Td>
+                              <Badge
+                                colorScheme={match.isWinner ? 'green' : 'red'}
+                                fontSize="sm"
+                                px={2}
+                                py={1}
+                                borderRadius="full"
+                              >
+                                {match.isWinner ? '勝利' : '敗北'}
+                              </Badge>
+                            </Td>
+                            <Td>
+                              <Badge
+                                colorScheme={match.winner === 'BLUE' ? 'blue' : 'red'}
+                                fontSize="sm"
+                                px={2}
+                                py={1}
+                                borderRadius="full"
+                              >
+                                {match.winner === 'BLUE' ? 'ブルーチーム' : 'レッドチーム'}
+                              </Badge>
+                            </Td>
+                          </Tr>
+                        ))}
+                      </Tbody>
+                    </Table>
+                  </Box>
+                )}
+              </VStack>
+            </ModalBody>
+            <ModalFooter>
+              <Button onClick={handleCloseHistoryModal}>閉じる</Button>
             </ModalFooter>
           </ModalContent>
         </Modal>
