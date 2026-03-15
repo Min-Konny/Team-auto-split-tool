@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "migrate:ahri-tags": "node scripts/replace-tags-ahri.mjs"
   },
   "dependencies": {
     "@chakra-ui/icons": "^2.2.4",

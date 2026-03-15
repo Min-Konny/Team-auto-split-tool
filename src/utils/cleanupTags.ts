@@ -1,54 +1,46 @@
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore'
+import { collection, doc, getDocs, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { Player } from '@/types'
 
-// 利用可能なタグオプション
-const AVAILABLE_TAGS = ['249', 'SHIFT', 'きらくに']
+const TARGET_TAG = 'アーリ組'
 
-// 不要なタグを削除する関数
+// Ahri class用: 全プレイヤーのタグを「アーリ組」に統一
 export async function cleanupInvalidTags() {
   try {
-    console.log('タグのクリーンアップを開始します...')
-    
+    console.log('タグ置換を開始します...')
+
     const querySnapshot = await getDocs(collection(db, 'players'))
-    const players = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
+    const players = querySnapshot.docs.map((playerDoc) => ({
+      id: playerDoc.id,
+      ...playerDoc.data(),
     })) as (Player & { id: string })[]
 
     let updatedCount = 0
 
     for (const player of players) {
-      if (player.tags && player.tags.length > 0) {
-        // 有効なタグのみを保持
-        const validTags = player.tags.filter(tag => AVAILABLE_TAGS.includes(tag))
-        
-        // タグが変更された場合のみ更新
-        if (validTags.length !== player.tags.length) {
-          const playerRef = doc(db, 'players', player.id)
-          await updateDoc(playerRef, {
-            tags: validTags.length > 0 ? validTags : undefined
-          })
-          
-          console.log(`プレイヤー ${player.name} のタグを更新: ${player.tags.join(', ')} → ${validTags.join(', ') || 'なし'}`)
-          updatedCount++
-        }
-      }
+      const currentTags = player.tags || []
+      const shouldUpdate = currentTags.length !== 1 || currentTags[0] !== TARGET_TAG
+      if (!shouldUpdate) continue
+
+      const playerRef = doc(db, 'players', player.id)
+      await updateDoc(playerRef, {
+        tags: [TARGET_TAG],
+      })
+
+      console.log(
+        `プレイヤー ${player.name} のタグを更新: ${currentTags.join(', ') || 'なし'} -> ${TARGET_TAG}`
+      )
+      updatedCount++
     }
 
-    console.log(`タグのクリーンアップが完了しました。${updatedCount}人のプレイヤーを更新しました。`)
+    console.log(`タグ置換が完了しました。${updatedCount}人のプレイヤーを更新しました。`)
     return updatedCount
   } catch (error) {
-    console.error('タグのクリーンアップ中にエラーが発生しました:', error)
+    console.error('タグ置換中にエラーが発生しました:', error)
     throw error
   }
 }
 
-// プレイヤーが有効なタグを持っているかチェック
 export function hasValidTags(player: Player): boolean {
-  if (!player.tags || player.tags.length === 0) {
-    return false
-  }
-  
-  return player.tags.some(tag => AVAILABLE_TAGS.includes(tag))
+  return !!player.tags?.includes(TARGET_TAG)
 }
