@@ -110,7 +110,7 @@ export default function TeamMaker() {
   const [roleSelectionMode, setRoleSelectionMode] = useState<RoleSelectionMode>('auto')
   const [isRoleAssignmentMode, setIsRoleAssignmentMode] = useState(false)
   const [isMatchResultRegistered, setIsMatchResultRegistered] = useState(false)
-  const [rateDifferenceTolerance, setRateDifferenceTolerance] = useState<number>(200) // レート差の許容値（デフォルト200）
+  const [rateDifferenceTolerance, setRateDifferenceTolerance] = useState<number>(500) // レート差の許容値（デフォルト500）
   const teamsRef = useRef<HTMLDivElement>(null)
   const toast = useToast()
   const { isOpen, onOpen, onClose } = useDisclosure()
@@ -265,42 +265,19 @@ export default function TeamMaker() {
         isClosable: true,
       })
     } else {
-      // 自動ロール選択モード（既存のロジック）
-      // 絶対にやりたくないロールのチェック
-      const allUnwantedRoles = players.flatMap(p => p.unwantedRoles)
-      const roleCounts = {
-        [GameRole.TOP]: 0,
-        [GameRole.JUNGLE]: 0,
-        [GameRole.MID]: 0,
-        [GameRole.ADC]: 0,
-        [GameRole.SUP]: 0,
-      }
-      
-      // 各ロールの絶対にやりたくない人数をカウント
-      allUnwantedRoles.forEach(role => {
-        roleCounts[role]++
-      })
-      
-      // 絶対にやりたくないロールが多すぎる場合のチェック
-      const maxUnwantedPerRole = 8 // 10人中8人以上が絶対にやりたくない場合はチーム分け不可
-      const problematicRoles = Object.entries(roleCounts).filter(([role, count]) => count >= maxUnwantedPerRole)
-      
-      if (problematicRoles.length > 0) {
-        const roleNames = problematicRoles.map(([role]) => role).join(', ')
-        toast({
-          title: 'チーム分けエラー',
-          description: `${roleNames}ロールを絶対にやりたくないプレイヤーが多すぎます。ロール手動選択モードでチーム分けを試してください。`,
-          status: 'error',
-          duration: 8000,
-          isClosable: true,
-        })
-        // ロール選択モードを手動に切り替え
-        setRoleSelectionMode('manual')
-        return
+      // 自動ロール選択モード：やりたくないロールを厳守しつつバランス最適化
+      const roles: GameRole[] = [GameRole.TOP, GameRole.JUNGLE, GameRole.MID, GameRole.ADC, GameRole.SUP]
+      const getRateByRole = (player: Player, role: GameRole) =>
+        role === player.mainRole ? player.mainRate : player.subRate
+      const compareScore = (a: number[], b: number[]) => {
+        for (let i = 0; i < a.length; i++) {
+          if (a[i] < b[i]) return -1
+          if (a[i] > b[i]) return 1
+        }
+        return 0
       }
 
-      // 各ロールのプレイヤーをグループ化
-      const roleGroups: { [key in GameRole]: SelectedPlayer[] } = {
+      const roleCandidates: Record<GameRole, SelectedPlayer[]> = {
         [GameRole.TOP]: [],
         [GameRole.JUNGLE]: [],
         [GameRole.MID]: [],
@@ -308,124 +285,120 @@ export default function TeamMaker() {
         [GameRole.SUP]: [],
       }
 
-      // 各プレイヤーを絶対にやりたくないロール以外の全ロールに配置
-      players.forEach((player) => {
-        Object.values(GameRole).forEach((gameRole) => {
-          if (!player.unwantedRoles.includes(gameRole)) {
-            roleGroups[gameRole].push(player)
+      players.forEach((selectedPlayer) => {
+        roles.forEach((role) => {
+          if (!selectedPlayer.unwantedRoles.includes(role)) {
+            roleCandidates[role].push(selectedPlayer)
           }
         })
       })
 
-      const roles: GameRole[] = [GameRole.TOP, GameRole.JUNGLE, GameRole.MID, GameRole.ADC, GameRole.SUP]
-      let bestTeams: { blue: { player: Player; role: GameRole }[]; red: { player: Player; role: GameRole }[] } | null = null
-      let minRateDifference = Infinity
-
-      // 複数回試行してベストな組み合わせを見つける
-      for (let attempt = 0; attempt < 100; attempt++) {
-        const blueTeam: { player: Player; role: GameRole }[] = []
-        const redTeam: { player: Player; role: GameRole }[] = []
-        const assignedPlayers = new Set<string>()
-
-        // ランダムな順序でロールを処理
-        const shuffledRoles = [...roles].sort(() => Math.random() - 0.5)
-
-        // チーム作成関数
-        const createTeam = (team: typeof blueTeam) => {
-          shuffledRoles.forEach(role => {
-            if (team.length >= 5) return
-
-            const availablePlayers = roleGroups[role]
-              .filter(p => !assignedPlayers.has(p.player.id))
-              .sort(() => Math.random() - 0.5)
-
-            if (availablePlayers.length > 0) {
-              const player = availablePlayers[0]
-              team.push({ player: player.player, role })
-              assignedPlayers.add(player.player.id)
-            }
-          })
-        }
-
-        // ブルーチームを作成
-        createTeam(blueTeam)
-
-        // レッドチームを作成
-        createTeam(redTeam)
-
-        // チームが完成している場合のみ評価
-        if (blueTeam.length === 5 && redTeam.length === 5) {
-          const blueRating = calculateTeamRating(blueTeam)
-          const redRating = calculateTeamRating(redTeam)
-          const teamRateDifference = Math.abs(blueRating - redRating)
-          
-          // 各ロールのレート差を計算
-          let maxRoleRateDifference = 0
-          let exceedingRolesCount = 0
-          roles.forEach(role => {
-            const bluePlayer = blueTeam.find(p => p.role === role)
-            const redPlayer = redTeam.find(p => p.role === role)
-            if (bluePlayer && redPlayer) {
-              const blueRate = bluePlayer.role === bluePlayer.player.mainRole 
-                ? bluePlayer.player.mainRate 
-                : bluePlayer.player.subRate
-              const redRate = redPlayer.role === redPlayer.player.mainRole 
-                ? redPlayer.player.mainRate 
-                : redPlayer.player.subRate
-              const roleDiff = Math.abs(blueRate - redRate)
-              maxRoleRateDifference = Math.max(maxRoleRateDifference, roleDiff)
-              if (roleDiff > rateDifferenceTolerance) {
-                exceedingRolesCount++
-              }
-            }
-          })
-          
-          // より良い組み合わせの条件：
-          // 1. 許容値を超えているロール数が少ない
-          // 2. 最大ロールレート差が小さい
-          // 3. チームレートの差が小さい
-          const currentScore = {
-            exceedingRolesCount,
-            maxRoleRateDifference,
-            teamRateDifference
-          }
-          const bestScore = bestTeams ? {
-            exceedingRolesCount: roles.reduce((count, role) => {
-              const diff = calculateRoleRateDifference(bestTeams!, role)
-              return count + (diff > rateDifferenceTolerance ? 1 : 0)
-            }, 0),
-            maxRoleRateDifference: Math.max(...roles.map(role => calculateRoleRateDifference(bestTeams!, role))),
-            teamRateDifference: Math.abs(calculateTeamRating(bestTeams!.blue) - calculateTeamRating(bestTeams!.red))
-          } : { exceedingRolesCount: Infinity, maxRoleRateDifference: Infinity, teamRateDifference: Infinity }
-
-          const isBetter = 
-            currentScore.exceedingRolesCount < bestScore.exceedingRolesCount ||
-            (currentScore.exceedingRolesCount === bestScore.exceedingRolesCount && 
-             currentScore.maxRoleRateDifference < bestScore.maxRoleRateDifference) ||
-            (currentScore.exceedingRolesCount === bestScore.exceedingRolesCount && 
-             currentScore.maxRoleRateDifference === bestScore.maxRoleRateDifference &&
-             currentScore.teamRateDifference < bestScore.teamRateDifference)
-
-          if (isBetter) {
-            minRateDifference = teamRateDifference
-            bestTeams = { blue: blueTeam, red: redTeam }
-          }
-        }
-      }
-
-      if (bestTeams) {
-        setTeams(bestTeams)
-        setIsRoleAssignmentMode(true) // 自動選択でもロール変更可能にする
-        setIsMatchResultRegistered(false) // 新しいチーム作成時は試合結果未登録状態にリセット
-        onOpen() // モーダルを開く
+      // 2チーム分で各ロール2名必要。満たせない場合は自動振り分け不可。
+      const insufficientRoles = roles.filter((role) => roleCandidates[role].length < 2)
+      if (insufficientRoles.length > 0) {
         toast({
-          title: 'チーム作成完了',
-          description: 'チーム分けが完了しました。ロールを手動で調整できます。',
-          status: 'success',
-          duration: 5000,
+          title: 'チーム分けエラー',
+          description: `やりたくないロール設定により ${insufficientRoles.join(', ')} の担当者が不足しています。設定を見直してください。`,
+          status: 'error',
+          duration: 8000,
           isClosable: true,
         })
+        return
       }
+
+      let bestTeams: { blue: { player: Player; role: GameRole }[]; red: { player: Player; role: GameRole }[] } | null = null
+      let bestScore: number[] | null = null
+
+      const pairByRole: Partial<Record<GameRole, [SelectedPlayer, SelectedPlayer]>> = {}
+
+      // ロールごとに2名ずつ選び、最後にBLUE/REDの向きを全探索して最良スコアを採用
+      const solveByRolePairs = (roleIndex: number, remainingPlayers: SelectedPlayer[]) => {
+        if (roleIndex === roles.length) {
+          for (let mask = 0; mask < (1 << roles.length); mask++) {
+            const blueTeam: { player: Player; role: GameRole }[] = []
+            const redTeam: { player: Player; role: GameRole }[] = []
+
+            roles.forEach((role, i) => {
+              const pair = pairByRole[role]
+              if (!pair) return
+              const assignSwapped = (mask & (1 << i)) !== 0
+              const bluePlayer = assignSwapped ? pair[1] : pair[0]
+              const redPlayer = assignSwapped ? pair[0] : pair[1]
+              blueTeam.push({ player: bluePlayer.player, role })
+              redTeam.push({ player: redPlayer.player, role })
+            })
+
+            if (blueTeam.length !== 5 || redTeam.length !== 5) {
+              return
+            }
+
+            const roleDiffs = roles.map((role) => {
+              const blueMember = blueTeam.find((member) => member.role === role)!
+              const redMember = redTeam.find((member) => member.role === role)!
+              return Math.abs(
+                getRateByRole(blueMember.player, role) - getRateByRole(redMember.player, role)
+              )
+            })
+            const exceedingRolesCount = roleDiffs.filter((diff) => diff > rateDifferenceTolerance).length
+            const maxRoleRateDifference = Math.max(...roleDiffs)
+            const sumRoleRateDifference = roleDiffs.reduce((sum, diff) => sum + diff, 0)
+            const teamRateDifference = Math.abs(calculateTeamRating(blueTeam) - calculateTeamRating(redTeam))
+            const currentScore = [
+              exceedingRolesCount,
+              teamRateDifference,
+              sumRoleRateDifference,
+              maxRoleRateDifference,
+            ]
+
+            if (!bestScore || compareScore(currentScore, bestScore) < 0) {
+              bestScore = currentScore
+              bestTeams = { blue: blueTeam, red: redTeam }
+            }
+          }
+          return
+        }
+
+        const currentRole = roles[roleIndex]
+        const candidates = remainingPlayers.filter((player) => !player.unwantedRoles.includes(currentRole))
+
+        for (let i = 0; i < candidates.length; i++) {
+          for (let j = i + 1; j < candidates.length; j++) {
+            const first = candidates[i]
+            const second = candidates[j]
+            pairByRole[currentRole] = [first, second]
+            const nextRemaining = remainingPlayers.filter(
+              (player) => player.player.id !== first.player.id && player.player.id !== second.player.id
+            )
+            solveByRolePairs(roleIndex + 1, nextRemaining)
+            delete pairByRole[currentRole]
+          }
+        }
+      }
+
+      solveByRolePairs(0, players)
+
+      if (!bestTeams) {
+        toast({
+          title: 'チーム分けエラー',
+          description: 'やりたくないロール設定のため、全員を自動で矛盾なく割り当てられませんでした。',
+          status: 'error',
+          duration: 8000,
+          isClosable: true,
+        })
+        return
+      }
+
+      setTeams(bestTeams)
+      setIsRoleAssignmentMode(true) // 自動選択でもロール変更可能にする
+      setIsMatchResultRegistered(false) // 新しいチーム作成時は試合結果未登録状態にリセット
+      onOpen() // モーダルを開く
+      toast({
+        title: 'チーム作成完了',
+        description: 'チーム分けが完了しました。ロールを手動で調整できます。',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      })
     }
   }
 
