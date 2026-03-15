@@ -114,6 +114,7 @@ export default function TeamMaker() {
   const teamsRef = useRef<HTMLDivElement>(null)
   const toast = useToast()
   const { isOpen, onOpen, onClose } = useDisclosure()
+  const memberCardBg = useColorModeValue('gray.50', 'gray.700')
 
   useEffect(() => {
     const fetchPlayers = async () => {
@@ -1032,7 +1033,7 @@ export default function TeamMaker() {
                               return (
                               <Card
                                 key={player.player.id}
-                                bg={isExceeding ? 'orange.100' : useColorModeValue('gray.50', 'gray.700')}
+                                bg={isExceeding ? 'orange.100' : memberCardBg}
                                 borderWidth={isExceeding ? "2px" : "1px"}
                                 borderColor={isExceeding ? "orange.400" : undefined}
                               >

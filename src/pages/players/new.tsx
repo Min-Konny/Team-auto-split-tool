@@ -31,15 +31,15 @@ import { useRouter } from 'next/router'
 import Layout from '@/components/Layout'
 import Card from '@/components/Card'
 
-// 利用可能なタグオプション
-const AVAILABLE_TAGS = ['249', 'SHIFT', 'きらくに']
+// 利用可能なタグオプション（Ahri class専用）
+const AVAILABLE_TAGS = ['アーリ組']
 
 export default function NewPlayer() {
   const [summonerName, setSummonerName] = useState('')
   const [nickname, setNickname] = useState('')
   const [mainRole, setMainRole] = useState<GameRole>(GameRole.TOP)
   const [mainRank, setMainRank] = useState<Rank>('UNRANKED')
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [selectedTags, setSelectedTags] = useState<string[]>(['アーリ組'])
   const [unwantedRoles, setUnwantedRoles] = useState<GameRole[]>([])
   const toast = useToast()
   const router = useRouter()

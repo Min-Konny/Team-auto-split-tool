@@ -56,8 +56,8 @@ import Layout from '@/components/Layout'
 import Card from '@/components/Card'
 import Link from 'next/link'
 
-// 利用可能なタグオプション
-const AVAILABLE_TAGS = ['249', 'SHIFT', 'きらくに']
+// 利用可能なタグオプション（Ahri class専用）
+const AVAILABLE_TAGS = ['アーリ組']
 
 interface EditingState {
   id: string | null;
