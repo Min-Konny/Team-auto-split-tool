@@ -2,12 +2,15 @@ import { collection, doc, getDocs, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { Player } from '@/types'
 
-const TARGET_TAG = 'アーリ組'
+const PRIMARY_TAG = 'アーリ組'
+const SECONDARY_TAG = 'その他'
+const VALID_TAGS = [PRIMARY_TAG, SECONDARY_TAG]
+const LEGACY_TAGS = ['249', 'SHIFT', 'きらくに']
 
-// Ahri class用: 全プレイヤーのタグを「アーリ組」に統一
+// Ahri class用: タグを「アーリ組 / その他」の2種類に正規化
 export async function cleanupInvalidTags() {
   try {
-    console.log('タグ置換を開始します...')
+    console.log('タグ正規化を開始します...')
 
     const querySnapshot = await getDocs(collection(db, 'players'))
     const players = querySnapshot.docs.map((playerDoc) => ({
@@ -19,28 +22,38 @@ export async function cleanupInvalidTags() {
 
     for (const player of players) {
       const currentTags = player.tags || []
-      const shouldUpdate = currentTags.length !== 1 || currentTags[0] !== TARGET_TAG
+
+      let nextTag = SECONDARY_TAG
+      if (currentTags.includes(PRIMARY_TAG)) {
+        nextTag = PRIMARY_TAG
+      } else if (currentTags.includes(SECONDARY_TAG)) {
+        nextTag = SECONDARY_TAG
+      } else if (currentTags.some((tag) => LEGACY_TAGS.includes(tag))) {
+        nextTag = SECONDARY_TAG
+      }
+
+      const shouldUpdate = currentTags.length !== 1 || currentTags[0] !== nextTag
       if (!shouldUpdate) continue
 
       const playerRef = doc(db, 'players', player.id)
       await updateDoc(playerRef, {
-        tags: [TARGET_TAG],
+        tags: [nextTag],
       })
 
       console.log(
-        `プレイヤー ${player.name} のタグを更新: ${currentTags.join(', ') || 'なし'} -> ${TARGET_TAG}`
+        `プレイヤー ${player.name} のタグを更新: ${currentTags.join(', ') || 'なし'} -> ${nextTag}`
       )
       updatedCount++
     }
 
-    console.log(`タグ置換が完了しました。${updatedCount}人のプレイヤーを更新しました。`)
+    console.log(`タグ正規化が完了しました。${updatedCount}人のプレイヤーを更新しました。`)
     return updatedCount
   } catch (error) {
-    console.error('タグ置換中にエラーが発生しました:', error)
+    console.error('タグ正規化中にエラーが発生しました:', error)
     throw error
   }
 }
 
 export function hasValidTags(player: Player): boolean {
-  return !!player.tags?.includes(TARGET_TAG)
+  return !!player.tags?.some((tag) => VALID_TAGS.includes(tag))
 }
