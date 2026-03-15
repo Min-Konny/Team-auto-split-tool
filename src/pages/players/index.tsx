@@ -57,7 +57,7 @@ import Card from '@/components/Card'
 import Link from 'next/link'
 
 // 利用可能なタグオプション（Ahri class専用）
-const AVAILABLE_TAGS = ['アーリ組']
+const AVAILABLE_TAGS = ['アーリ組', 'その他']
 
 interface EditingState {
   id: string | null;

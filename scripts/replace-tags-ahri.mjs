@@ -47,24 +47,35 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 }
 
-const TARGET_TAG = 'アーリ組'
+const PRIMARY_TAG = 'アーリ組'
+const SECONDARY_TAG = 'その他'
+const LEGACY_TAGS = ['249', 'SHIFT', 'きらくに']
 
 const app = initializeApp(firebaseConfig)
 const db = getFirestore(app)
 
 async function run() {
-  console.log('[INFO] Start replacing tags to アーリ組')
+  console.log('[INFO] Start normalizing tags to アーリ組 / その他')
   const snapshot = await getDocs(collection(db, 'players'))
   let updatedCount = 0
 
   for (const playerDoc of snapshot.docs) {
     const player = playerDoc.data()
     const tags = Array.isArray(player.tags) ? player.tags : []
-    const shouldUpdate = tags.length !== 1 || tags[0] !== TARGET_TAG
+    let nextTag = SECONDARY_TAG
+    if (tags.includes(PRIMARY_TAG)) {
+      nextTag = PRIMARY_TAG
+    } else if (tags.includes(SECONDARY_TAG)) {
+      nextTag = SECONDARY_TAG
+    } else if (tags.some((tag) => LEGACY_TAGS.includes(tag))) {
+      nextTag = SECONDARY_TAG
+    }
+
+    const shouldUpdate = tags.length !== 1 || tags[0] !== nextTag
     if (!shouldUpdate) continue
 
     await updateDoc(doc(db, 'players', playerDoc.id), {
-      tags: [TARGET_TAG],
+      tags: [nextTag],
     })
     updatedCount++
   }

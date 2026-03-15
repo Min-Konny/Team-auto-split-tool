@@ -32,14 +32,14 @@ import Layout from '@/components/Layout'
 import Card from '@/components/Card'
 
 // 利用可能なタグオプション（Ahri class専用）
-const AVAILABLE_TAGS = ['アーリ組']
+const AVAILABLE_TAGS = ['アーリ組', 'その他']
 
 export default function NewPlayer() {
   const [summonerName, setSummonerName] = useState('')
   const [nickname, setNickname] = useState('')
   const [mainRole, setMainRole] = useState<GameRole>(GameRole.TOP)
   const [mainRank, setMainRank] = useState<Rank>('UNRANKED')
-  const [selectedTags, setSelectedTags] = useState<string[]>(['アーリ組'])
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [unwantedRoles, setUnwantedRoles] = useState<GameRole[]>([])
   const toast = useToast()
   const router = useRouter()
@@ -126,9 +126,9 @@ export default function NewPlayer() {
 
     try {
       const rates = calculateRates()
+      const trimmedNickname = nickname.trim()
       const player: Omit<Player, 'id'> = {
         name: summonerName,
-        nickname: nickname.trim() || undefined,
         mainRole,
         mainRate: rates.mainRate,
         subRate: rates.subRate,
@@ -137,7 +137,8 @@ export default function NewPlayer() {
           losses: 0,
         },
         tags: selectedTags,
-        unwantedRoles: unwantedRoles.length > 0 ? unwantedRoles : undefined,
+        ...(trimmedNickname ? { nickname: trimmedNickname } : {}),
+        ...(unwantedRoles.length > 0 ? { unwantedRoles } : {}),
       }
 
       await addDoc(collection(db, 'players'), player)
