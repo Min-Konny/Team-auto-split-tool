@@ -56,8 +56,8 @@ import Layout from '@/components/Layout'
 import Card from '@/components/Card'
 import Link from 'next/link'
 
-// 利用可能なタグオプション（Ahri class専用）
-const AVAILABLE_TAGS = ['アーリ組', 'その他']
+// 利用可能なタグオプション
+const AVAILABLE_TAGS = ['249', 'SHIFT', 'きらくに']
 
 interface EditingState {
   id: string | null;
@@ -351,7 +351,7 @@ export default function Players() {
     try {
       const playerRef = doc(db, 'players', playerId)
       await updateDoc(playerRef, {
-        unwantedRoles: editingUnwantedRoles.unwantedRoles.length > 0 ? editingUnwantedRoles.unwantedRoles : null
+        unwantedRoles: editingUnwantedRoles.unwantedRoles.length > 0 ? editingUnwantedRoles.unwantedRoles : []
       })
 
       // プレイヤーリストを更新

@@ -31,8 +31,8 @@ import { useRouter } from 'next/router'
 import Layout from '@/components/Layout'
 import Card from '@/components/Card'
 
-// 利用可能なタグオプション（Ahri class専用）
-const AVAILABLE_TAGS = ['アーリ組', 'その他']
+// 利用可能なタグオプション
+const AVAILABLE_TAGS = ['249', 'SHIFT', 'きらくに']
 
 export default function NewPlayer() {
   const [summonerName, setSummonerName] = useState('')
