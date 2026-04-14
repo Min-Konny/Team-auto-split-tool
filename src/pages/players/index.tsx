@@ -57,7 +57,7 @@ import Card from '@/components/Card'
 import Link from 'next/link'
 
 // 利用可能なタグオプション
-const AVAILABLE_TAGS = ['249', 'SHIFT', 'きらくに']
+const AVAILABLE_TAGS = ['249', 'SHIFT', 'きらくに', 'その他']
 
 interface EditingState {
   id: string | null;
@@ -906,9 +906,14 @@ export default function Players() {
           </Box>
         </Card>
 
-        <Text fontSize="sm" color="gray.600" textAlign="center">
-          ※プレイヤーの削除が必要な場合は、Discordで「こにー」までご連絡ください。
-        </Text>
+        <VStack spacing={1}>
+          <Text fontSize="sm" color="gray.600" textAlign="center">
+            ※プレイヤーの削除が必要な場合は、Discordで「こにー」までご連絡ください。
+          </Text>
+          <Text fontSize="sm" color="gray.600" textAlign="center">
+            ※タグ作成依頼はdiscord:konny0329sまでお願いします。
+          </Text>
+        </VStack>
 
         {/* レート編集モーダル */}
         <Modal isOpen={isRateModalOpen} onClose={handleCancelRatesModal} size="xl">

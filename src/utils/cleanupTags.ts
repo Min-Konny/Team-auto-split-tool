@@ -3,7 +3,7 @@ import { db } from '@/lib/firebase'
 import { Player } from '@/types'
 
 // 利用可能なタグオプション
-const AVAILABLE_TAGS = ['249', 'SHIFT', 'きらくに']
+const AVAILABLE_TAGS = ['249', 'SHIFT', 'きらくに', 'その他']
 
 // 不要なタグを削除する関数
 export async function cleanupInvalidTags() {

@@ -32,7 +32,7 @@ import Layout from '@/components/Layout'
 import Card from '@/components/Card'
 
 // 利用可能なタグオプション
-const AVAILABLE_TAGS = ['249', 'SHIFT', 'きらくに']
+const AVAILABLE_TAGS = ['249', 'SHIFT', 'きらくに', 'その他']
 
 export default function NewPlayer() {
   const [summonerName, setSummonerName] = useState('')
