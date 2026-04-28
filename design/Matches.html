@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Matches — LoL Team Maker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --bg-0: oklch(0.16 0.02 250);
+  --bg-1: oklch(0.20 0.022 250);
+  --bg-2: oklch(0.24 0.024 250);
+  --line: oklch(0.30 0.02 250);
+  --line-2: oklch(0.40 0.025 250);
+  --fg-0: oklch(0.96 0.01 250);
+  --fg-1: oklch(0.78 0.015 250);
+  --fg-2: oklch(0.58 0.018 250);
+  --fg-3: oklch(0.42 0.02 250);
+  --blue: oklch(0.72 0.16 240);
+  --blue-d: oklch(0.42 0.14 240);
+  --blue-bg: oklch(0.22 0.07 240);
+  --red: oklch(0.68 0.20 25);
+  --red-d: oklch(0.42 0.17 25);
+  --red-bg: oklch(0.22 0.10 25);
+  --gold: oklch(0.82 0.13 85);
+  --ok: oklch(0.76 0.16 145);
+  --r-top: oklch(0.72 0.18 25);
+  --r-jng: oklch(0.76 0.16 145);
+  --r-mid: oklch(0.72 0.16 240);
+  --r-adc: oklch(0.72 0.18 305);
+  --r-sup: oklch(0.80 0.15 70);
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { background: var(--bg-0); color: var(--fg-0); font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+
+/* topbar */
+.topbar { position: sticky; top: 0; z-index: 50; backdrop-filter: blur(18px); background: color-mix(in oklch, var(--bg-0) 85%, transparent); border-bottom: 1px solid var(--line); }
+.topbar-inner { max-width: 1440px; margin: 0 auto; padding: 12px 28px; display: flex; align-items: center; justify-content: space-between; }
+.brand { display: flex; align-items: center; gap: 10px; font-family: 'Space Grotesk'; font-weight: 600; font-size: 15px; text-decoration: none; color: inherit; }
+.brand-mark { width: 26px; height: 26px; position: relative; }
+.brand-mark::before, .brand-mark::after { content: ""; position: absolute; inset: 0; border-radius: 3px; }
+.brand-mark::before { background: linear-gradient(135deg, var(--blue), var(--blue-d)); clip-path: polygon(0 0,100% 0,100% 100%,50% 100%,0 50%); }
+.brand-mark::after  { background: linear-gradient(135deg, var(--red-d), var(--red)); clip-path: polygon(50% 100%,100% 100%,100% 50%); }
+.brand-sub { font-family: 'JetBrains Mono'; font-size: 10px; color: var(--fg-3); letter-spacing: 0.12em; text-transform: uppercase; margin-left: 4px; }
+.nav { display: flex; gap: 2px; }
+.nav a { padding: 7px 14px; border-radius: 999px; color: var(--fg-1); font-size: 13px; text-decoration: none; transition: background 0.15s, color 0.15s; }
+.nav a:hover { background: var(--bg-2); color: var(--fg-0); }
+.nav a.active { background: var(--bg-2); color: var(--fg-0); }
+
+/* page */
+.page { max-width: 1440px; margin: 0 auto; padding: 28px 28px 60px; }
+.page-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+.page-hd h1 { font-family: 'Space Grotesk'; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin: 0; }
+
+/* stats strip */
+.stats-strip {
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  background: var(--bg-1); border: 1px solid var(--line);
+  border-radius: 14px; overflow: hidden; margin-bottom: 20px;
+}
+.stat-cell { padding: 18px 20px; border-right: 1px solid var(--line); }
+.stat-cell:last-child { border-right: 0; }
+.stat-k { font-family: 'JetBrains Mono'; font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--fg-3); }
+.stat-v { font-family: 'Space Grotesk'; font-size: 28px; font-weight: 600; letter-spacing: -0.03em; margin-top: 6px; }
+.stat-v .unit { font-size: 14px; color: var(--fg-3); font-family: 'JetBrains Mono'; margin-left: 3px; }
+
+/* role badge */
+.role-badge { font-family: 'JetBrains Mono'; font-size: 9.5px; font-weight: 600; padding: 2px 0; border-radius: 4px; letter-spacing: 0.04em; width: 54px; text-align: center; display: inline-block; background: var(--bg-2); }
+.role-badge.TOP    { color: var(--r-top); border: 1px solid color-mix(in oklch, var(--r-top) 35%, transparent); }
+.role-badge.JUNGLE { color: var(--r-jng); border: 1px solid color-mix(in oklch, var(--r-jng) 35%, transparent); }
+.role-badge.MID    { color: var(--r-mid); border: 1px solid color-mix(in oklch, var(--r-mid) 35%, transparent); }
+.role-badge.ADC    { color: var(--r-adc); border: 1px solid color-mix(in oklch, var(--r-adc) 35%, transparent); }
+.role-badge.SUP    { color: var(--r-sup); border: 1px solid color-mix(in oklch, var(--r-sup) 35%, transparent); }
+
+/* match list */
+.match-list { display: flex; flex-direction: column; gap: 8px; }
+
+.match-card {
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: 13px;
+  overflow: hidden; transition: border-color 0.15s;
+  cursor: pointer;
+}
+.match-card:hover { border-color: var(--line-2); }
+.match-card.expanded { border-color: var(--line-2); }
+.match-card.blue-win { border-left: 3px solid var(--blue-d); }
+.match-card.red-win  { border-left: 3px solid var(--red-d); }
+
+/* compact row */
+.match-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 80px 1fr 100px 36px;
+  align-items: center; gap: 12px; padding: 14px 18px;
+}
+.match-date { font-family: 'JetBrains Mono'; font-size: 11.5px; color: var(--fg-2); }
+.match-date .day { font-size: 13px; color: var(--fg-1); font-weight: 600; display: block; }
+
+/* team cols */
+.team-col { display: flex; flex-direction: column; gap: 5px; }
+.team-col.red-col { align-items: flex-end; }
+.team-player-row { display: flex; align-items: center; gap: 7px; }
+.team-col.red-col .team-player-row { flex-direction: row-reverse; }
+.team-player-name { font-size: 12.5px; font-weight: 500; }
+
+/* vs center */
+.vs-center { text-align: center; }
+.vs-word { font-family: 'Space Grotesk'; font-size: 14px; font-weight: 700; color: var(--fg-3); }
+.rate-diff { font-family: 'JetBrains Mono'; font-size: 10px; color: var(--fg-3); margin-top: 3px; }
+
+/* winner */
+.winner-col { text-align: right; }
+.winner-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 7px;
+  font-family: 'JetBrains Mono'; font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+}
+.winner-badge.blue { background: color-mix(in oklch, var(--blue) 18%, transparent); color: var(--blue); border: 1px solid var(--blue-d); }
+.winner-badge.red  { background: color-mix(in oklch, var(--red)  18%, transparent); color: var(--red);  border: 1px solid var(--red-d); }
+
+/* chevron */
+.chevron { color: var(--fg-3); transition: transform 0.2s; flex-shrink: 0; }
+.match-card.expanded .chevron { transform: rotate(180deg); }
+
+/* expanded detail */
+.match-detail {
+  border-top: 1px solid var(--line); padding: 16px 18px;
+  display: grid; grid-template-columns: 1fr 100px 1fr; gap: 12px;
+  animation: detailIn 0.15s ease;
+}
+@keyframes detailIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.detail-side { display: flex; flex-direction: column; gap: 6px; }
+.detail-side.blue-side { background: color-mix(in oklch, var(--blue-bg) 40%, transparent); border-radius: 10px; padding: 12px 14px; }
+.detail-side.red-side  { background: color-mix(in oklch, var(--red-bg)  40%, transparent); border-radius: 10px; padding: 12px 14px; }
+.detail-side-hd { font-family: 'JetBrains Mono'; font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; margin-bottom: 8px; }
+.detail-side.blue-side .detail-side-hd { color: var(--blue); }
+.detail-side.red-side  .detail-side-hd { color: var(--red); }
+.detail-player { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid color-mix(in oklch, var(--line) 60%, transparent); }
+.detail-player:last-child { border-bottom: 0; }
+.detail-name { font-size: 13px; font-weight: 600; flex: 1; }
+.detail-rate { font-family: 'JetBrains Mono'; font-size: 12px; color: var(--fg-2); text-align: right; }
+.detail-center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+.detail-center .vc { font-family: 'Space Grotesk'; font-weight: 700; font-size: 18px; color: var(--fg-3); }
+.detail-diff-rows { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+.diff-row { display: flex; align-items: center; justify-content: space-between; }
+.diff-role { font-family: 'JetBrains Mono'; font-size: 10px; color: var(--fg-3); }
+.diff-num { font-family: 'JetBrains Mono'; font-size: 12px; font-weight: 600; color: var(--ok); }
+
+/* filter bar */
+.filter-bar { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
+.filter-btn { font-family: 'JetBrains Mono'; font-size: 11px; letter-spacing: 0.08em; padding: 7px 16px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--fg-2); cursor: pointer; transition: all 0.12s; }
+.filter-btn:hover { border-color: var(--line-2); color: var(--fg-1); }
+.filter-btn.active { background: var(--bg-2); color: var(--fg-0); border-color: var(--line-2); }
+.filter-btn.blue-f.active { background: color-mix(in oklch, var(--blue) 18%, transparent); border-color: var(--blue-d); color: var(--blue); }
+.filter-btn.red-f.active  { background: color-mix(in oklch, var(--red)  18%, transparent); border-color: var(--red-d);  color: var(--red); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel">
+const { useState, useMemo } = React;
+
+const PLAYERS = {
+  '1': {name:'Konny',  nickname:'コニー',   mainRole:'TOP',    mainRate:2210, subRate:1989},
+  '2': {name:'Saito',  nickname:'サイトー',  mainRole:'JUNGLE', mainRate:1980, subRate:1782},
+  '3': {name:'Yura',   nickname:'ゆら',     mainRole:'MID',    mainRate:1850, subRate:1665},
+  '4': {name:'Mochi',  nickname:'もち',     mainRole:'ADC',    mainRate:1700, subRate:1530},
+  '5': {name:'Pyon',   nickname:'ぴょん',   mainRole:'SUP',    mainRate:1470, subRate:1323},
+  '6': {name:'Riku',   nickname:'リク',     mainRole:'TOP',    mainRate:2150, subRate:1935},
+  '7': {name:'Hiro',   nickname:'ひろ',     mainRole:'JUNGLE', mainRate:2010, subRate:1809},
+  '8': {name:'Kiri',   nickname:'きり',     mainRole:'MID',    mainRate:1820, subRate:1638},
+  '9': {name:'Nao',    nickname:'なお',     mainRole:'ADC',    mainRate:1730, subRate:1557},
+  '10':{name:'Toi',    nickname:'とい',     mainRole:'SUP',    mainRate:1480, subRate:1332},
+  '11':{name:'Rin',    nickname:'りん',     mainRole:'MID',    mainRate:1620, subRate:1458},
+  '12':{name:'Kota',   nickname:'こうた',   mainRole:'TOP',    mainRate:1900, subRate:1710},
+  '13':{name:'Shu',    nickname:'しゅう',   mainRole:'JUNGLE', mainRate:1750, subRate:1575},
+  '14':{name:'Mika',   nickname:'みか',     mainRole:'SUP',    mainRate:1550, subRate:1395},
+  '15':{name:'Yoshi',  nickname:'よし',     mainRole:'ADC',    mainRate:2100, subRate:1890},
+};
+
+const MATCHES = [
+  { id:'m1', date:{seconds:1745700120}, winner:'BLUE', players:[
+    {playerId:'1',team:'BLUE',role:'TOP'},{playerId:'2',team:'BLUE',role:'JUNGLE'},
+    {playerId:'3',team:'BLUE',role:'MID'},{playerId:'4',team:'BLUE',role:'ADC'},{playerId:'5',team:'BLUE',role:'SUP'},
+    {playerId:'6',team:'RED',role:'TOP'},{playerId:'7',team:'RED',role:'JUNGLE'},
+    {playerId:'8',team:'RED',role:'MID'},{playerId:'9',team:'RED',role:'ADC'},{playerId:'10',team:'RED',role:'SUP'},
+  ]},
+  { id:'m2', date:{seconds:1745613720}, winner:'RED', players:[
+    {playerId:'6',team:'BLUE',role:'TOP'},{playerId:'7',team:'BLUE',role:'JUNGLE'},
+    {playerId:'3',team:'BLUE',role:'MID'},{playerId:'4',team:'BLUE',role:'ADC'},{playerId:'10',team:'BLUE',role:'SUP'},
+    {playerId:'1',team:'RED',role:'TOP'},{playerId:'2',team:'RED',role:'JUNGLE'},
+    {playerId:'8',team:'RED',role:'MID'},{playerId:'9',team:'RED',role:'ADC'},{playerId:'5',team:'RED',role:'SUP'},
+  ]},
+  { id:'m3', date:{seconds:1745440320}, winner:'BLUE', players:[
+    {playerId:'1',team:'BLUE',role:'TOP'},{playerId:'7',team:'BLUE',role:'JUNGLE'},
+    {playerId:'8',team:'BLUE',role:'MID'},{playerId:'4',team:'BLUE',role:'ADC'},{playerId:'10',team:'BLUE',role:'SUP'},
+    {playerId:'2',team:'RED',role:'JUNGLE'},{playerId:'3',team:'RED',role:'MID'},
+    {playerId:'6',team:'RED',role:'TOP'},{playerId:'9',team:'RED',role:'ADC'},{playerId:'5',team:'RED',role:'SUP'},
+  ]},
+  { id:'m4', date:{seconds:1745268120}, winner:'RED', players:[
+    {playerId:'12',team:'BLUE',role:'TOP'},{playerId:'13',team:'BLUE',role:'JUNGLE'},
+    {playerId:'11',team:'BLUE',role:'MID'},{playerId:'15',team:'BLUE',role:'ADC'},{playerId:'14',team:'BLUE',role:'SUP'},
+    {playerId:'1',team:'RED',role:'TOP'},{playerId:'2',team:'RED',role:'JUNGLE'},
+    {playerId:'3',team:'RED',role:'MID'},{playerId:'4',team:'RED',role:'ADC'},{playerId:'5',team:'RED',role:'SUP'},
+  ]},
+  { id:'m5', date:{seconds:1745095320}, winner:'BLUE', players:[
+    {playerId:'6',team:'BLUE',role:'TOP'},{playerId:'7',team:'BLUE',role:'JUNGLE'},
+    {playerId:'11',team:'BLUE',role:'MID'},{playerId:'15',team:'BLUE',role:'ADC'},{playerId:'14',team:'BLUE',role:'SUP'},
+    {playerId:'12',team:'RED',role:'TOP'},{playerId:'13',team:'RED',role:'JUNGLE'},
+    {playerId:'3',team:'RED',role:'MID'},{playerId:'9',team:'RED',role:'ADC'},{playerId:'5',team:'RED',role:'SUP'},
+  ]},
+];
+
+const ROLES = ['TOP','JUNGLE','MID','ADC','SUP'];
+
+function getRateForRole(player, role) {
+  return role === player.mainRole ? player.mainRate : player.subRate;
+}
+function getTeamAvg(players, teamPlayers) {
+  return Math.round(teamPlayers.reduce((s, tp) => {
+    const p = players[tp.playerId];
+    return s + (p ? getRateForRole(p, tp.role) : 0);
+  }, 0) / teamPlayers.length);
+}
+function getRoleDiffs(matchPlayers, players) {
+  const diffs = {};
+  ROLES.forEach(role => {
+    const b = matchPlayers.find(p=>p.team==='BLUE'&&p.role===role);
+    const r = matchPlayers.find(p=>p.team==='RED'&&p.role===role);
+    if (b && r && players[b.playerId] && players[r.playerId]) {
+      diffs[role] = Math.abs(getRateForRole(players[b.playerId],role) - getRateForRole(players[r.playerId],role));
+    }
+  });
+  return diffs;
+}
+function fmtDate(seconds) {
+  const d = new Date(seconds * 1000);
+  return {
+    day: d.toLocaleDateString('ja-JP',{month:'2-digit',day:'2-digit'}),
+    time: d.toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),
+  };
+}
+
+function RoleBadge({ role }) {
+  return <span className={`role-badge ${role}`}>{role}</span>;
+}
+
+function MatchCard({ match, expanded, onToggle }) {
+  const blue = match.players.filter(p=>p.team==='BLUE');
+  const red  = match.players.filter(p=>p.team==='RED');
+  const blueAvg = getTeamAvg(PLAYERS, blue);
+  const redAvg  = getTeamAvg(PLAYERS, red);
+  const totalDiff = Math.abs(blueAvg - redAvg);
+  const diffs = useMemo(()=>getRoleDiffs(match.players, PLAYERS),[match.id]);
+  const { day, time } = fmtDate(match.date.seconds);
+  const isBlueWin = match.winner === 'BLUE';
+
+  return (
+    <div className={`match-card ${isBlueWin?'blue-win':'red-win'} ${expanded?'expanded':''}`} data-screen-label={`Match ${match.id}`}>
+      <div className="match-row" onClick={onToggle}>
+        {/* Date */}
+        <div className="match-date">
+          <span className="day">{day}</span>
+          {time}
+        </div>
+
+        {/* Blue team */}
+        <div className="team-col">
+          {blue.map(tp => {
+            const p = PLAYERS[tp.playerId];
+            return p ? (
+              <div key={tp.playerId} className="team-player-row">
+                <RoleBadge role={tp.role} />
+                <span className="team-player-name" style={{color: isBlueWin?'var(--fg-0)':'var(--fg-2)'}}>{p.nickname||p.name}</span>
+              </div>
+            ) : null;
+          })}
+        </div>
+
+        {/* VS */}
+        <div className="vs-center">
+          <div className="vs-word">VS</div>
+          <div className="rate-diff">Δ{totalDiff}</div>
+        </div>
+
+        {/* Red team */}
+        <div className="team-col red-col">
+          {red.map(tp => {
+            const p = PLAYERS[tp.playerId];
+            return p ? (
+              <div key={tp.playerId} className="team-player-row">
+                <RoleBadge role={tp.role} />
+                <span className="team-player-name" style={{color: !isBlueWin?'var(--fg-0)':'var(--fg-2)'}}>{p.nickname||p.name}</span>
+              </div>
+            ) : null;
+          })}
+        </div>
+
+        {/* Winner */}
+        <div className="winner-col">
+          <span className={`winner-badge ${isBlueWin?'blue':'red'}`}>
+            {isBlueWin ? (
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
+            ) : (
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
+            )}
+            {match.winner} WIN
+          </span>
+        </div>
+
+        {/* Chevron */}
+        <div className="chevron">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+      </div>
+
+      {/* Expanded detail */}
+      {expanded && (
+        <div className="match-detail">
+          <div className="detail-side blue-side">
+            <div className="detail-side-hd">BLUE SIDE · avg {blueAvg}</div>
+            {blue.map(tp => {
+              const p = PLAYERS[tp.playerId];
+              if (!p) return null;
+              const rate = getRateForRole(p, tp.role);
+              return (
+                <div key={tp.playerId} className="detail-player">
+                  <RoleBadge role={tp.role} />
+                  <span className="detail-name">{p.nickname||p.name}</span>
+                  <span className="detail-rate">{rate}</span>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="detail-center">
+            <div className="vc">VS</div>
+            <div className="detail-diff-rows">
+              {Object.entries(diffs).map(([role, diff])=>(
+                <div key={role} className="diff-row">
+                  <span className="diff-role">{role.slice(0,3)}</span>
+                  <span className="diff-num">Δ{diff}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="detail-side red-side">
+            <div className="detail-side-hd">RED SIDE · avg {redAvg}</div>
+            {red.map(tp => {
+              const p = PLAYERS[tp.playerId];
+              if (!p) return null;
+              const rate = getRateForRole(p, tp.role);
+              return (
+                <div key={tp.playerId} className="detail-player">
+                  <RoleBadge role={tp.role} />
+                  <span className="detail-name">{p.nickname||p.name}</span>
+                  <span className="detail-rate">{rate}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [filter, setFilter] = useState('all'); // all | blue | red
+  const [expanded, setExpanded] = useState(null);
+
+  const blueWins = MATCHES.filter(m=>m.winner==='BLUE').length;
+  const redWins  = MATCHES.filter(m=>m.winner==='RED').length;
+  const blueWinRate = Math.round(blueWins/MATCHES.length*100);
+
+  const filtered = useMemo(()=>
+    MATCHES.filter(m=> filter==='all' || m.winner===filter.toUpperCase())
+  ,[filter]);
+
+  const lastDate = fmtDate(MATCHES[0].date.seconds);
+
+  return (
+    <>
+      <header className="topbar">
+        <div className="topbar-inner">
+          <a className="brand" href="Top Page.html">
+            <span className="brand-mark"></span>
+            <span>Team Maker<span className="brand-sub">/ LoL</span></span>
+          </a>
+          <nav className="nav">
+            <a href="Top Page.html">ホーム</a>
+            <a href="Players.html">プレイヤー</a>
+            <a href="Team Maker.html">チーム作成</a>
+            <a href="#" className="active">試合履歴</a>
+          </nav>
+        </div>
+      </header>
+
+      <div className="page">
+        <div className="page-hd">
+          <h1>試合履歴</h1>
+        </div>
+
+        {/* Stats */}
+        <div className="stats-strip">
+          <div className="stat-cell">
+            <div className="stat-k">Total Matches</div>
+            <div className="stat-v">{MATCHES.length}</div>
+          </div>
+          <div className="stat-cell">
+            <div className="stat-k">Blue Wins</div>
+            <div className="stat-v" style={{color:'var(--blue)'}}>{blueWins}</div>
+          </div>
+          <div className="stat-cell">
+            <div className="stat-k">Red Wins</div>
+            <div className="stat-v" style={{color:'var(--red)'}}>{redWins}</div>
+          </div>
+          <div className="stat-cell">
+            <div className="stat-k">Blue Win Rate</div>
+            <div className="stat-v">{blueWinRate}<span className="unit">%</span></div>
+          </div>
+          <div className="stat-cell">
+            <div className="stat-k">Last Match</div>
+            <div className="stat-v" style={{fontSize:20}}>{lastDate.day}<span className="unit">{lastDate.time}</span></div>
+          </div>
+        </div>
+
+        {/* Filter */}
+        <div className="filter-bar">
+          <button className={`filter-btn${filter==='all'?' active':''}`} onClick={()=>setFilter('all')}>ALL</button>
+          <button className={`filter-btn blue-f${filter==='blue'?' active':''}`} onClick={()=>setFilter('blue')}>BLUE WIN</button>
+          <button className={`filter-btn red-f${filter==='red'?' active':''}`} onClick={()=>setFilter('red')}>RED WIN</button>
+        </div>
+
+        {/* Match list */}
+        <div className="match-list">
+          {filtered.map(match=>(
+            <MatchCard key={match.id} match={match}
+              expanded={expanded===match.id}
+              onToggle={()=>setExpanded(prev=>prev===match.id?null:match.id)} />
+          ))}
+          {filtered.length===0&&(
+            <div style={{textAlign:'center',color:'var(--fg-3)',fontFamily:"'JetBrains Mono'",fontSize:'12px',padding:'40px'}}>
+              該当する試合がありません
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
