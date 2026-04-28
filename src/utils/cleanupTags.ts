@@ -1,16 +1,19 @@
 import { collection, doc, getDocs, updateDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { AVAILABLE_TAGS } from '@/constants/playerTags'
 import { Player } from '@/types'
 
-const PRIMARY_TAG = 'アーリ組'
-const SECONDARY_TAG = 'その他'
-const VALID_TAGS = [PRIMARY_TAG, SECONDARY_TAG]
-const LEGACY_TAGS = ['249', 'SHIFT', 'きらくに']
+const VALID = new Set<string>([...AVAILABLE_TAGS])
 
-// Ahri class用: タグを「アーリ組 / その他」の2種類に正規化
+/** タグ表記を整える */
+function normalizeTag(tag: string): string {
+  return tag.trim()
+}
+
+// 不要なタグを削除し、表記ゆれを修正する
 export async function cleanupInvalidTags() {
   try {
-    console.log('タグ正規化を開始します...')
+    console.log('タグのクリーンアップを開始します...')
 
     const querySnapshot = await getDocs(collection(db, 'players'))
     const players = querySnapshot.docs.map((playerDoc) => ({
@@ -21,39 +24,36 @@ export async function cleanupInvalidTags() {
     let updatedCount = 0
 
     for (const player of players) {
-      const currentTags = player.tags || []
+      if (!player.tags || player.tags.length === 0) continue
 
-      let nextTag = SECONDARY_TAG
-      if (currentTags.includes(PRIMARY_TAG)) {
-        nextTag = PRIMARY_TAG
-      } else if (currentTags.includes(SECONDARY_TAG)) {
-        nextTag = SECONDARY_TAG
-      } else if (currentTags.some((tag) => LEGACY_TAGS.includes(tag))) {
-        nextTag = SECONDARY_TAG
+      const mapped = player.tags.map(normalizeTag)
+      const validTags = mapped.filter((tag) => VALID.has(tag))
+
+      if (validTags.length !== player.tags.length || mapped.some((x, i) => x !== player.tags![i])) {
+        const playerRef = doc(db, 'players', player.id)
+        await updateDoc(playerRef, {
+          tags: validTags.length > 0 ? validTags : undefined,
+        })
+
+        console.log(
+          `プレイヤー ${player.name} のタグを更新: ${player.tags.join(', ')} → ${validTags.join(', ') || 'なし'}`
+        )
+        updatedCount++
       }
-
-      const shouldUpdate = currentTags.length !== 1 || currentTags[0] !== nextTag
-      if (!shouldUpdate) continue
-
-      const playerRef = doc(db, 'players', player.id)
-      await updateDoc(playerRef, {
-        tags: [nextTag],
-      })
-
-      console.log(
-        `プレイヤー ${player.name} のタグを更新: ${currentTags.join(', ') || 'なし'} -> ${nextTag}`
-      )
-      updatedCount++
     }
 
-    console.log(`タグ正規化が完了しました。${updatedCount}人のプレイヤーを更新しました。`)
+    console.log(`タグのクリーンアップが完了しました。${updatedCount}人のプレイヤーを更新しました。`)
     return updatedCount
   } catch (error) {
-    console.error('タグ正規化中にエラーが発生しました:', error)
+    console.error('タグのクリーンアップ中にエラーが発生しました:', error)
     throw error
   }
 }
 
 export function hasValidTags(player: Player): boolean {
-  return !!player.tags?.some((tag) => VALID_TAGS.includes(tag))
+  if (!player.tags || player.tags.length === 0) {
+    return false
+  }
+
+  return player.tags.some((tag) => VALID.has(normalizeTag(tag)))
 }
