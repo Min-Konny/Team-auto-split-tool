@@ -1,71 +1,24 @@
-import { useEffect, useState, useRef } from 'react'
-import {
-  Box,
-  Button,
-  Container,
-  FormControl,
-  FormLabel,
-  Heading,
-  Input,
-  Select,
-  Stack,
-  VStack,
-  Text,
-  HStack,
-  useToast,
-  SimpleGrid,
-  Card,
-  CardBody,
-  CardHeader,
-  InputGroup,
-  InputLeftElement,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuGroup,
-  MenuItem,
-  Badge,
-  IconButton,
-  Divider,
-  useColorModeValue,
-  Checkbox,
-  CheckboxGroup,
-  Wrap,
-  WrapItem,
-  Tag,
-  TagLabel,
-  Accordion,
-  AccordionItem,
-  AccordionButton,
-  AccordionPanel,
-  AccordionIcon,
-  Radio,
-  RadioGroup,
-  Flex,
-  Spacer,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
-  useDisclosure,
-} from '@chakra-ui/react'
-import { SearchIcon, DeleteIcon, RepeatIcon } from '@chakra-ui/icons'
-import { collection, getDocs, addDoc, doc, updateDoc } from 'firebase/firestore'
-import { db } from '../../lib/firebase'
-import { Player, Role, GameRole, Match, Rank, RANK_RATES } from '../../types'
-import Layout from '../../components/Layout'
+import { useEffect, useMemo, useState } from 'react'
+import Header from '@/components/Header'
+import RoleBadge from '@/components/RoleBadge'
+import { Timestamp, addDoc, collection, doc, getDocs, updateDoc } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
+import { GameRole, Player, Rank } from '@/types'
 
-interface SelectedPlayer {
-  player: Player & { id: string }
-  unwantedRoles: GameRole[]
-}
+type SelectedPlayer = { player: Player; unwantedRoles: GameRole[] }
+type TeamSlot = { player: Player; role: GameRole }
+type Teams = { blue: TeamSlot[]; red: TeamSlot[] }
 
-type RoleSelectionMode = 'auto' | 'manual'
+const ROLES: GameRole[] = [GameRole.TOP, GameRole.JUNGLE, GameRole.MID, GameRole.ADC, GameRole.SUP]
 
-// レートからランクを判定する関数
+const getRateForRole = (player: Player, role: GameRole): number =>
+  role === player.mainRole ? player.mainRate : player.subRate
+
+const getAvgRate = (team: TeamSlot[]) =>
+  team.length ? Math.round(team.reduce((s, t) => s + getRateForRole(t.player, t.role), 0) / team.length) : 0
+
+const getTotalRate = (team: TeamSlot[]) => team.reduce((s, t) => s + getRateForRole(t.player, t.role), 0)
+
 const getRankFromRate = (rate: number): Rank => {
   if (rate >= 3000) return 'CHALLENGER'
   if (rate >= 2700) return 'GRANDMASTER'
@@ -80,1156 +33,378 @@ const getRankFromRate = (rate: number): Rank => {
   return 'UNRANKED'
 }
 
-// ランクの色を取得する関数
-const getRankColor = (rank: Rank): string => {
-  const colors: { [key in Rank]: string } = {
-    UNRANKED: 'gray',
-    IRON: 'gray',
-    BRONZE: 'orange',
-    SILVER: 'gray',
-    GOLD: 'yellow',
-    PLATINUM: 'green',
-    EMERALD: 'teal',
-    DIAMOND: 'blue',
-    MASTER: 'purple',
-    GRANDMASTER: 'pink',
-    CHALLENGER: 'red'
+const buildTeams = (selectedPlayers: SelectedPlayer[]): Teams => {
+  const sorted = [...selectedPlayers].sort((a, b) => b.player.mainRate - a.player.mainRate)
+  const bluePool = [0, 3, 4, 7, 8].map((i) => sorted[i])
+  const redPool = [1, 2, 5, 6, 9].map((i) => sorted[i])
+
+  const assignRoles = (pool: SelectedPlayer[]): TeamSlot[] => {
+    const res: TeamSlot[] = pool.map((sp) => ({ player: sp.player, role: GameRole.TOP }))
+    const used = new Set<GameRole>()
+    const done = new Set<number>()
+
+    pool.forEach((sp, i) => {
+      const r = sp.player.mainRole
+      if (!sp.unwantedRoles.includes(r) && !used.has(r)) {
+        res[i].role = r
+        used.add(r)
+        done.add(i)
+      }
+    })
+
+    const rem = ROLES.filter((r) => !used.has(r))
+    pool.forEach((sp, i) => {
+      if (done.has(i)) return
+      const avail = rem.filter((r) => !sp.unwantedRoles.includes(r))
+      const pick = avail[0] ?? rem[0] ?? sp.player.mainRole
+      res[i].role = pick
+      const idx = rem.indexOf(pick)
+      if (idx >= 0) rem.splice(idx, 1)
+    })
+    return res
   }
-  return colors[rank] || 'gray'
+
+  return { blue: assignRoles(bluePool), red: assignRoles(redPool) }
 }
 
-export default function TeamMaker() {
+export default function TeamMakerPage() {
   const [players, setPlayers] = useState<Player[]>([])
-  const [selectedPlayers, setSelectedPlayers] = useState<SelectedPlayer[]>([])
-  const [teams, setTeams] = useState<{
-    blue: { player: Player; role: GameRole }[]
-    red: { player: Player; role: GameRole }[]
-  } | null>(null)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [selected, setSelected] = useState<SelectedPlayer[]>([])
+  const [search, setSearch] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [roleSelectionMode, setRoleSelectionMode] = useState<RoleSelectionMode>('auto')
-  const [isRoleAssignmentMode, setIsRoleAssignmentMode] = useState(false)
-  const [isMatchResultRegistered, setIsMatchResultRegistered] = useState(false)
-  const [rateDifferenceTolerance, setRateDifferenceTolerance] = useState<number>(500) // レート差の許容値（デフォルト500）
-  const teamsRef = useRef<HTMLDivElement>(null)
-  const toast = useToast()
-  const { isOpen, onOpen, onClose } = useDisclosure()
-  const memberCardBg = useColorModeValue('gray.50', 'gray.700')
+  const [mode, setMode] = useState<'auto' | 'manual'>('auto')
+  const [tolerance, setTolerance] = useState(500)
+  const [teams, setTeams] = useState<Teams | null>(null)
+  const [showOverlay, setShowOverlay] = useState(false)
+  const [result, setResult] = useState<'BLUE' | 'RED' | null>(null)
+  const [justAdded, setJustAdded] = useState<string | null>(null)
+  const [swapSource, setSwapSource] = useState<{ team: 'blue' | 'red'; idx: number; id: string } | null>(null)
 
   useEffect(() => {
     const fetchPlayers = async () => {
-      const querySnapshot = await getDocs(collection(db, 'players'))
-      const playersData = querySnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Player[]
-      setPlayers(playersData)
+      const snapshot = await getDocs(collection(db, 'players'))
+      setPlayers(snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as Player[])
     }
-
-    fetchPlayers()
+    fetchPlayers().catch(console.error)
   }, [])
 
-  // ページを離れようとした際の確認ダイアログ
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (teams && !isMatchResultRegistered) {
-        const message = '試合結果を登録していませんが、よろしいですか？'
-        e.preventDefault()
-        e.returnValue = message
-        return message
-      }
-    }
+  const availableTags = useMemo(() => Array.from(new Set(players.flatMap((p) => p.tags || []))).sort(), [players])
 
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-    }
-  }, [teams, isMatchResultRegistered])
+  const filtered = useMemo(
+    () =>
+      players.filter((p) => {
+        const q = search.toLowerCase()
+        const mSearch = (p.nickname || '').toLowerCase().includes(q) || p.name.toLowerCase().includes(q)
+        const mTag = selectedTags.length === 0 || selectedTags.some((t) => p.tags?.includes(t))
+        return mSearch && mTag
+      }),
+    [players, search, selectedTags]
+  )
 
-  // 利用可能なタグを取得
-  const availableTags = Array.from(
-    new Set(
-      players
-        .flatMap(player => player.tags || [])
-        .filter(tag => tag.trim() !== '')
+  const isSelected = (id?: string) => selected.some((s) => s.player.id === id)
+
+  const addPlayer = (player: Player) => {
+    if (!player.id || selected.length >= 10 || isSelected(player.id)) return
+    setSelected((prev) => [...prev, { player, unwantedRoles: [...(player.unwantedRoles || [])] }])
+    setJustAdded(player.id)
+    window.setTimeout(() => setJustAdded(null), 500)
+  }
+
+  const removePlayer = (idx: number) => setSelected((prev) => prev.filter((_, i) => i !== idx))
+
+  const toggleUnwanted = (idx: number, role: GameRole) => {
+    setSelected((prev) =>
+      prev.map((s, i) => {
+        if (i !== idx) return s
+        const has = s.unwantedRoles.includes(role)
+        return { ...s, unwantedRoles: has ? s.unwantedRoles.filter((r) => r !== role) : [...s.unwantedRoles, role] }
+      })
     )
-  ).sort()
-
-  // フィルタリングされたプレイヤー
-  const filteredPlayers = players.filter((player) => {
-    const displayName = player.nickname || player.name
-    const matchesSearch = displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         player.name.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesTags = selectedTags.length === 0 || 
-      selectedTags.some(tag => player.tags?.includes(tag))
-    return matchesSearch && matchesTags
-  })
-
-  const handleAddPlayer = (player: Player) => {
-    if (selectedPlayers.length >= 10) {
-      toast({
-        title: 'エラー',
-        description: '最大10人まで選択できます',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-      return
-    }
-
-    setSelectedPlayers([
-      ...selectedPlayers,
-      {
-        player,
-        unwantedRoles: player.unwantedRoles || [], // 登録済みの絶対にやりたくないロールを初期選択
-      },
-    ])
   }
 
-  const handleRemovePlayer = (index: number) => {
-    setSelectedPlayers(selectedPlayers.filter((_, i) => i !== index))
+  const createTeams = () => {
+    if (selected.length < 10) return
+    setTeams(buildTeams(selected))
+    setResult(null)
+    setSwapSource(null)
+    setShowOverlay(true)
   }
 
-  // 絶対にやりたくないロールを追加/削除
-  const handleUnwantedRoleToggle = (index: number, role: GameRole) => {
-    const newSelectedPlayers = [...selectedPlayers]
-    const currentUnwantedRoles = newSelectedPlayers[index].unwantedRoles
-    
-    if (currentUnwantedRoles.includes(role)) {
-      // 絶対にやりたくないロールから削除
-      newSelectedPlayers[index].unwantedRoles = currentUnwantedRoles.filter(r => r !== role)
-    } else {
-      // 絶対にやりたくないロールに追加
-      newSelectedPlayers[index].unwantedRoles = [...currentUnwantedRoles, role]
-    }
-    
-    setSelectedPlayers(newSelectedPlayers)
-  }
+  const totalDiff = useMemo(() => {
+    if (!teams) return 0
+    return Math.abs(getTotalRate(teams.blue) - getTotalRate(teams.red))
+  }, [teams])
 
-  const calculateTeamRating = (team: { player: Player; role: GameRole }[]) => {
-    return Math.round(team.reduce((sum, { player, role }) => {
-      return sum + (role === player.mainRole ? player.mainRate : player.subRate)
-    }, 0))
-  }
-
-  const createTeams = (playersToUse?: SelectedPlayer[]) => {
-    const players = playersToUse || selectedPlayers
-    
-    if (players.length !== 10) {
-      toast({
-        title: 'エラー',
-        description: '10人を選択してください',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-      return
-    }
-
-    if (roleSelectionMode === 'manual') {
-      // 手動ロール選択モード：メインロールのレートだけでチーム分け
-      const playersWithMainRates = players.map(sp => ({
-        ...sp,
-        rate: sp.player.mainRate
-      }))
-
-      // レート順にソート
-      playersWithMainRates.sort((a, b) => b.rate - a.rate)
-
-      // 交互にチームに振り分け
-      const blueTeam: { player: Player; role: GameRole }[] = []
-      const redTeam: { player: Player; role: GameRole }[] = []
-
-      playersWithMainRates.forEach((playerData, index) => {
-        const teamMember = {
-          player: playerData.player,
-          role: GameRole.TOP // 仮のロール、後で手動で変更
-        }
-
-        if (index % 2 === 0) {
-          blueTeam.push(teamMember)
-        } else {
-          redTeam.push(teamMember)
-        }
-      })
-
-      setTeams({ blue: blueTeam, red: redTeam })
-      setIsRoleAssignmentMode(true)
-      setIsMatchResultRegistered(false) // 新しいチーム作成時は試合結果未登録状態にリセット
-      onOpen() // モーダルを開く
-      toast({
-        title: 'チーム作成完了',
-        description: 'チーム分けが完了しました。ロールを手動で設定してください。',
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
-      })
-    } else {
-      // 自動ロール選択モード：やりたくないロールを厳守しつつバランス最適化
-      const roles: GameRole[] = [GameRole.TOP, GameRole.JUNGLE, GameRole.MID, GameRole.ADC, GameRole.SUP]
-      const getRateByRole = (player: Player, role: GameRole) =>
-        role === player.mainRole ? player.mainRate : player.subRate
-      const compareScore = (a: number[], b: number[]) => {
-        for (let i = 0; i < a.length; i++) {
-          if (a[i] < b[i]) return -1
-          if (a[i] > b[i]) return 1
-        }
-        return 0
-      }
-
-      const roleCandidates: Record<GameRole, SelectedPlayer[]> = {
-        [GameRole.TOP]: [],
-        [GameRole.JUNGLE]: [],
-        [GameRole.MID]: [],
-        [GameRole.ADC]: [],
-        [GameRole.SUP]: [],
-      }
-
-      players.forEach((selectedPlayer) => {
-        roles.forEach((role) => {
-          if (!selectedPlayer.unwantedRoles.includes(role)) {
-            roleCandidates[role].push(selectedPlayer)
-          }
-        })
-      })
-
-      // 2チーム分で各ロール2名必要。満たせない場合は自動振り分け不可。
-      const insufficientRoles = roles.filter((role) => roleCandidates[role].length < 2)
-      if (insufficientRoles.length > 0) {
-        toast({
-          title: 'チーム分けエラー',
-          description: `やりたくないロール設定により ${insufficientRoles.join(', ')} の担当者が不足しています。設定を見直してください。`,
-          status: 'error',
-          duration: 8000,
-          isClosable: true,
-        })
-        return
-      }
-
-      let bestTeams: { blue: { player: Player; role: GameRole }[]; red: { player: Player; role: GameRole }[] } | null = null
-      let bestScore: number[] | null = null
-
-      const pairByRole: Partial<Record<GameRole, [SelectedPlayer, SelectedPlayer]>> = {}
-
-      // ロールごとに2名ずつ選び、最後にBLUE/REDの向きを全探索して最良スコアを採用
-      const solveByRolePairs = (roleIndex: number, remainingPlayers: SelectedPlayer[]) => {
-        if (roleIndex === roles.length) {
-          for (let mask = 0; mask < (1 << roles.length); mask++) {
-            const blueTeam: { player: Player; role: GameRole }[] = []
-            const redTeam: { player: Player; role: GameRole }[] = []
-
-            roles.forEach((role, i) => {
-              const pair = pairByRole[role]
-              if (!pair) return
-              const assignSwapped = (mask & (1 << i)) !== 0
-              const bluePlayer = assignSwapped ? pair[1] : pair[0]
-              const redPlayer = assignSwapped ? pair[0] : pair[1]
-              blueTeam.push({ player: bluePlayer.player, role })
-              redTeam.push({ player: redPlayer.player, role })
-            })
-
-            if (blueTeam.length !== 5 || redTeam.length !== 5) {
-              return
-            }
-
-            const roleDiffs = roles.map((role) => {
-              const blueMember = blueTeam.find((member) => member.role === role)!
-              const redMember = redTeam.find((member) => member.role === role)!
-              return Math.abs(
-                getRateByRole(blueMember.player, role) - getRateByRole(redMember.player, role)
-              )
-            })
-            const exceedingRolesCount = roleDiffs.filter((diff) => diff > rateDifferenceTolerance).length
-            const maxRoleRateDifference = Math.max(...roleDiffs)
-            const sumRoleRateDifference = roleDiffs.reduce((sum, diff) => sum + diff, 0)
-            const teamRateDifference = Math.abs(calculateTeamRating(blueTeam) - calculateTeamRating(redTeam))
-            const currentScore = [
-              exceedingRolesCount,
-              teamRateDifference,
-              sumRoleRateDifference,
-              maxRoleRateDifference,
-            ]
-
-            if (!bestScore || compareScore(currentScore, bestScore) < 0) {
-              bestScore = currentScore
-              bestTeams = { blue: blueTeam, red: redTeam }
-            }
-          }
-          return
-        }
-
-        const currentRole = roles[roleIndex]
-        const candidates = remainingPlayers.filter((player) => !player.unwantedRoles.includes(currentRole))
-
-        for (let i = 0; i < candidates.length; i++) {
-          for (let j = i + 1; j < candidates.length; j++) {
-            const first = candidates[i]
-            const second = candidates[j]
-            pairByRole[currentRole] = [first, second]
-            const nextRemaining = remainingPlayers.filter(
-              (player) => player.player.id !== first.player.id && player.player.id !== second.player.id
-            )
-            solveByRolePairs(roleIndex + 1, nextRemaining)
-            delete pairByRole[currentRole]
-          }
-        }
-      }
-
-      solveByRolePairs(0, players)
-
-      if (!bestTeams) {
-        toast({
-          title: 'チーム分けエラー',
-          description: 'やりたくないロール設定のため、全員を自動で矛盾なく割り当てられませんでした。',
-          status: 'error',
-          duration: 8000,
-          isClosable: true,
-        })
-        return
-      }
-
-      setTeams(bestTeams)
-      setIsRoleAssignmentMode(true) // 自動選択でもロール変更可能にする
-      setIsMatchResultRegistered(false) // 新しいチーム作成時は試合結果未登録状態にリセット
-      onOpen() // モーダルを開く
-      toast({
-        title: 'チーム作成完了',
-        description: 'チーム分けが完了しました。ロールを手動で調整できます。',
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
-      })
-    }
-  }
-
-  // チーム再生成用の関数
-  const regenerateTeams = () => {
+  const handleSwapClick = (team: 'blue' | 'red', idx: number) => {
     if (!teams) return
-    
-    // 現在のチームからselectedPlayersを復元
-    const currentTeamPlayers = [
-      ...teams.blue.map((t: { player: Player; role: GameRole }) => t.player),
-      ...teams.red.map((t: { player: Player; role: GameRole }) => t.player)
+    const tp = teams[team][idx]
+    if (!tp) return
+
+    if (!swapSource) {
+      setSwapSource({ team, idx, id: tp.player.id || '' })
+      return
+    }
+    if (swapSource.team === team && swapSource.idx === idx) {
+      setSwapSource(null)
+      return
+    }
+    const next = { blue: [...teams.blue], red: [...teams.red] }
+    const tmp = next[swapSource.team][swapSource.idx]
+    next[swapSource.team][swapSource.idx] = next[team][idx]
+    next[team][idx] = tmp
+    setTeams(next)
+    setSwapSource(null)
+  }
+
+  const byRole = (team: 'blue' | 'red', role: GameRole) => {
+    if (!teams) return { tp: undefined as TeamSlot | undefined, idx: -1 }
+    const idx = teams[team].findIndex((t) => t.role === role)
+    return { tp: idx >= 0 ? teams[team][idx] : undefined, idx }
+  }
+
+  const registerMatch = async (winner: 'BLUE' | 'RED') => {
+    if (!teams) return
+    const payload = [
+      ...teams.blue.map((p) => ({ playerId: p.player.id, role: p.role, team: 'BLUE' as const })),
+      ...teams.red.map((p) => ({ playerId: p.player.id, role: p.role, team: 'RED' as const })),
     ]
-    
-    // 重複を除去してselectedPlayersに設定
-    const uniquePlayers = currentTeamPlayers.filter((player, index, self) =>
-      index === self.findIndex(p => p.id === player.id)
-    )
-    
-    const restoredSelectedPlayers: SelectedPlayer[] = uniquePlayers.map(player => ({
-      player,
-      unwantedRoles: player.unwantedRoles || []
-    }))
-    
-    setSelectedPlayers(restoredSelectedPlayers)
-    
-    // 復元したselectedPlayersを直接渡してチーム作成
-    createTeams(restoredSelectedPlayers)
-  }
-
-  const handleMatchResult = async (winner: 'BLUE' | 'RED') => {
-    if (!teams) return
-
-    const match: Omit<Match, 'id'> = {
-      date: {
-        seconds: Math.floor(new Date().getTime() / 1000),
-        nanoseconds: 0
-      },
-      players: [
-        ...teams.blue.map((p) => ({ playerId: p.player.id, role: p.role, team: 'BLUE' as const })),
-        ...teams.red.map((p) => ({ playerId: p.player.id, role: p.role, team: 'RED' as const })),
-      ],
-      winner,
-    }
-
-    try {
-      const matchRef = await addDoc(collection(db, 'matches'), match)
-
-      // プレイヤーのレートを更新（ローカルとFirebase両方）
-      const updatedPlayers = [...players]
-      const updatePromises = match.players.map(async ({ playerId, role, team }) => {
-        const playerRef = doc(db, 'players', playerId)
-        const player = players.find((p) => p.id === playerId)
-        if (!player) return
-
-        const isWinner = team === winner
-        const rateChange = isWinner ? 50 : -50
-        const isMainRole = role === player.mainRole
-
-        // ローカルのプレイヤーリストを即座に更新
-        const playerIndex = updatedPlayers.findIndex(p => p.id === playerId)
-        if (playerIndex !== -1) {
-          updatedPlayers[playerIndex] = {
-            ...updatedPlayers[playerIndex],
-            [isMainRole ? 'mainRate' : 'subRate']: (isMainRole ? player.mainRate : player.subRate) + rateChange,
-            stats: {
-              ...updatedPlayers[playerIndex].stats,
-              [isWinner ? 'wins' : 'losses']: updatedPlayers[playerIndex].stats[isWinner ? 'wins' : 'losses'] + 1,
-            }
-          }
-        }
-
-        // Firebaseも更新
-        await updateDoc(playerRef, {
-          [isMainRole ? 'mainRate' : 'subRate']: (isMainRole ? player.mainRate : player.subRate) + rateChange,
-          [`stats.${isWinner ? 'wins' : 'losses'}`]: player.stats[isWinner ? 'wins' : 'losses'] + 1,
+    await addDoc(collection(db, 'matches'), { date: Timestamp.now(), players: payload, winner })
+    await Promise.all(
+      payload.map(async (p) => {
+        const player = players.find((pl) => pl.id === p.playerId)
+        if (!player || !p.playerId) return
+        await updateDoc(doc(db, 'players', p.playerId), {
+          'stats.wins': (player.stats?.wins || 0) + (p.team === winner ? 1 : 0),
+          'stats.losses': (player.stats?.losses || 0) + (p.team === winner ? 0 : 1),
         })
       })
-
-      // ローカルのプレイヤーリストを即座に更新
-      setPlayers(updatedPlayers)
-
-      await Promise.all(updatePromises)
-
-      // teams内のプレイヤー情報も更新して、モーダル内のレート表示を即座に反映
-      if (teams) {
-        const updatedTeams = {
-          blue: teams.blue.map((teamMember) => {
-            const updatedPlayer = updatedPlayers.find(p => p.id === teamMember.player.id)
-            return updatedPlayer 
-              ? { ...teamMember, player: updatedPlayer }
-              : teamMember
-          }),
-          red: teams.red.map((teamMember) => {
-            const updatedPlayer = updatedPlayers.find(p => p.id === teamMember.player.id)
-            return updatedPlayer 
-              ? { ...teamMember, player: updatedPlayer }
-              : teamMember
-          })
-        }
-        setTeams(updatedTeams)
-      }
-
-      toast({
-        title: '成功',
-        description: '試合結果を保存しました',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      })
-
-      // チーム構成は保持し、選択されたプレイヤーはリセット
-      setSelectedPlayers([])
-      setIsMatchResultRegistered(true)
-      // setTeams(null) を削除してチーム構成を保持
-    } catch (error) {
-      console.error('Error saving match:', error)
-      toast({
-        title: 'エラー',
-        description: '試合結果の保存に失敗しました',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-    }
+    )
+    setResult(winner)
   }
 
-
-  const handleSwapPlayers = (team1: 'blue' | 'red', index1: number, team2: 'blue' | 'red', index2: number) => {
-    if (!teams) return;
-
-    const newTeams = {
-      blue: [...teams.blue],
-      red: [...teams.red],
-    };
-
-    const temp = newTeams[team1][index1];
-    newTeams[team1][index1] = newTeams[team2][index2];
-    newTeams[team2][index2] = temp;
-
-    setTeams(newTeams);
-  };
-
-  const handleRoleChange = (team: 'blue' | 'red', playerIndex: number, newRole: GameRole) => {
-    if (!teams) return;
-
-    const newTeams = {
-      blue: [...teams.blue],
-      red: [...teams.red],
-    };
-
-    newTeams[team][playerIndex] = {
-      ...newTeams[team][playerIndex],
-      role: newRole
-    };
-
-    setTeams(newTeams);
-  };
-
-  const getRoleColor = (role: GameRole) => {
-    const colors: { [key in GameRole]: string } = {
-      [GameRole.TOP]: 'red',
-      [GameRole.JUNGLE]: 'green',
-      [GameRole.MID]: 'blue',
-      [GameRole.ADC]: 'purple',
-      [GameRole.SUP]: 'orange'
-    }
-    return colors[role] || 'gray'
-  }
-
-  const calculateAverageRate = (team: { player: Player; role: GameRole }[]) => {
-    if (team.length === 0) return 0
-    const totalRate = team.reduce((sum, { player, role }) => {
-      const rate = role === player.mainRole ? 
-        player.mainRate : 
-        player.subRate
-      return sum + rate
-    }, 0)
-    return Math.round(totalRate / team.length)
-  }
-
-  // 各ロールのレート差を計算する関数
-  const calculateRoleRateDifference = (
-    teams: { blue: { player: Player; role: GameRole }[]; red: { player: Player; role: GameRole }[] },
-    role: GameRole
-  ): number => {
-    const bluePlayer = teams.blue.find(p => p.role === role)
-    const redPlayer = teams.red.find(p => p.role === role)
-    
-    if (!bluePlayer || !redPlayer) return 0
-    
-    const blueRate = bluePlayer.role === bluePlayer.player.mainRole 
-      ? bluePlayer.player.mainRate 
-      : bluePlayer.player.subRate
-    const redRate = redPlayer.role === redPlayer.player.mainRole 
-      ? redPlayer.player.mainRate 
-      : redPlayer.player.subRate
-    
-    return Math.abs(blueRate - redRate)
-  }
-
-  // 許容値を超えているロールを取得する関数
-  const getExceedingToleranceRoles = (
-    teams: { blue: { player: Player; role: GameRole }[]; red: { player: Player; role: GameRole }[] } | null
-  ): GameRole[] => {
-    if (!teams) return []
-    
-    const exceedingRoles: GameRole[] = []
-    const roles: GameRole[] = [GameRole.TOP, GameRole.JUNGLE, GameRole.MID, GameRole.ADC, GameRole.SUP]
-    
-    roles.forEach(role => {
-      const rateDiff = calculateRoleRateDifference(teams, role)
-      if (rateDiff > rateDifferenceTolerance) {
-        exceedingRoles.push(role)
-      }
-    })
-    
-    return exceedingRoles
-  }
+  const remain = 10 - selected.length
 
   return (
-    <Layout>
-      <VStack spacing={6} align="stretch" pb="120px">
-        <Heading textAlign="center" color="blue.600" fontSize={{ base: '2xl', md: '3xl' }}>
-          チームメーカー
-        </Heading>
-
-        <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6}>
-          {/* プレイヤー選択エリア */}
-          <Card>
-            <CardHeader>
-              <Heading size="md" color="gray.700">
-                プレイヤー選択
-              </Heading>
-            </CardHeader>
-            <CardBody>
-              <VStack spacing={4} align="stretch">
-                {/* 検索バー */}
-                <InputGroup>
-                  <InputLeftElement pointerEvents="none">
-                    <SearchIcon color="gray.300" />
-                  </InputLeftElement>
-                  <Input
-                    placeholder="プレイヤー名で検索..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    size="md"
-                  />
-                </InputGroup>
-
-                {/* タグフィルター */}
-                {availableTags.length > 0 && (
-                  <VStack spacing={3} align="stretch">
-                    <Text fontSize="sm" fontWeight="bold">
-                      タグで絞り込み ({selectedTags.length}個選択中)
-                    </Text>
-                    <CheckboxGroup
-                      value={selectedTags}
-                      onChange={(values) => setSelectedTags(values as string[])}
-                    >
-                      <Wrap spacing={2}>
-                        {availableTags.map((tag) => (
-                          <WrapItem key={tag}>
-                            <Checkbox value={tag} colorScheme="blue">
-                              <Tag
-                                size="md"
-                                variant="outline"
-                                colorScheme="blue"
-                              >
-                                <TagLabel>{tag}</TagLabel>
-                              </Tag>
-                            </Checkbox>
-                          </WrapItem>
-                        ))}
-                      </Wrap>
-                    </CheckboxGroup>
-                    {selectedTags.length > 0 && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        colorScheme="gray"
-                        onClick={() => setSelectedTags([])}
-                      >
-                        フィルターをクリア
-                      </Button>
-                    )}
-                  </VStack>
+    <div>
+      <Header />
+      <div className="page-layout">
+        <section className="panel">
+          <div className="panel-hd">
+            <h2>プレイヤー</h2>
+            <span className="count">{filtered.length} / {players.length}</span>
+          </div>
+          <div className="search-area">
+            <div className="search-row">
+              <svg className="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="名前で検索…" />
+            </div>
+            <div className="tag-row">
+              {availableTags.map((tag) => (
+                <button key={tag} className={`tag-chip${selectedTags.includes(tag) ? ' active' : ''}`} onClick={() => setSelectedTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])}>
+                  {tag}
+                </button>
+              ))}
+              {selectedTags.length > 0 && <button className="tag-chip" onClick={() => setSelectedTags([])}>✕ 解除</button>}
+            </div>
+          </div>
+          <div className="panel-body">
+            {filtered.map((p) => (
+              <div key={p.id} className={`pool-card${isSelected(p.id) ? ' pool-selected' : ''}${justAdded === p.id ? ' just-added' : ''}`} onClick={() => addPlayer(p)}>
+                <RoleBadge role={p.mainRole} />
+                <div className="card-info">
+                  <div className="name">{p.nickname || p.name}</div>
+                  {p.nickname && <div className="sub-name">{p.name}</div>}
+                  <div className="rates">M <strong>{p.mainRate}</strong> <span className="dot">·</span> S <strong>{p.subRate}</strong> <span className="rank">{getRankFromRate(p.mainRate)}</span></div>
+                </div>
+                {!isSelected(p.id) ? (
+                  <div className="add-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg></div>
+                ) : (
+                  <div className="add-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5" /></svg></div>
                 )}
+              </div>
+            ))}
+          </div>
+        </section>
 
-                {/* プレイヤーリスト */}
-                <Box maxH="400px" overflowY="auto">
-                  <VStack spacing={2} align="stretch">
-                    {filteredPlayers.map((player) => {
-                      const isSelected = selectedPlayers.some((sp) => sp.player.id === player.id)
-                      return (
-                        <Card
-                          key={player.id}
-                          bg={isSelected ? 'blue.50' : 'white'}
-                          border="1px solid"
-                          borderColor={isSelected ? 'blue.200' : 'gray.200'}
-                          cursor={isSelected ? 'not-allowed' : 'pointer'}
-                          onClick={() => !isSelected && handleAddPlayer(player)}
-                          _hover={!isSelected ? { bg: 'gray.50' } : {}}
-                        >
-                          <CardBody p={3}>
-                            <VStack spacing={2} align="stretch">
-                              <HStack justify="space-between">
-                                <VStack align="start" spacing={0}>
-                                  <Text fontWeight="bold">{player.nickname || player.name}</Text>
-                                  {player.nickname && (
-                                    <Text fontSize="xs" color="gray.500">
-                                      {player.name}
-                                    </Text>
-                                  )}
-                                </VStack>
-                                <Badge colorScheme={getRoleColor(player.mainRole)}>
-                                  {player.mainRole}
-                                </Badge>
-                              </HStack>
-                              <HStack spacing={2} wrap="wrap">
-                                <Text fontSize="sm" color="gray.600">
-                                  メイン: {player.mainRate}
-                                </Text>
-                                <Badge colorScheme={getRankColor(getRankFromRate(player.mainRate))} size="sm">
-                                  {getRankFromRate(player.mainRate)}
-                                </Badge>
-                                <Text fontSize="sm" color="gray.600">
-                                  サブ: {player.subRate}
-                                </Text>
-                                <Badge colorScheme={getRankColor(getRankFromRate(player.subRate))} size="sm">
-                                  {getRankFromRate(player.subRate)}
-                                </Badge>
-                              </HStack>
-                              {player.tags && player.tags.length > 0 && (
-                                <Wrap spacing={1}>
-                                  {player.tags.map((tag, index) => (
-                                    <WrapItem key={index}>
-                                      <Tag size="sm" variant="outline" colorScheme="blue">
-                                        <TagLabel>{tag}</TagLabel>
-                                      </Tag>
-                                    </WrapItem>
-                                  ))}
-                                </Wrap>
-                              )}
-                            </VStack>
-                          </CardBody>
-                        </Card>
-                      )
-                    })}
-                  </VStack>
-                </Box>
-              </VStack>
-            </CardBody>
-          </Card>
-
-          {/* 選択されたプレイヤーエリア */}
-          <Card>
-            <CardHeader>
-              <Heading size="md" color="gray.700">
-                選択されたプレイヤー ({selectedPlayers.length}/10)
-              </Heading>
-            </CardHeader>
-            <CardBody>
-              <VStack spacing={4} align="stretch">
-                {selectedPlayers.map((selectedPlayer, index) => (
-                  <Card key={selectedPlayer.player.id} bg="blue.50">
-                    <CardBody p={3}>
-                      <VStack spacing={3} align="stretch">
-                        <HStack justify="space-between">
-                          <VStack align="start" spacing={1}>
-                            <Text fontWeight="bold">{selectedPlayer.player.nickname || selectedPlayer.player.name}</Text>
-                            {selectedPlayer.player.nickname && (
-                              <Text fontSize="xs" color="gray.500">
-                                {selectedPlayer.player.name}
-                              </Text>
-                            )}
-                            <HStack spacing={2} wrap="wrap">
-                              <Text fontSize="xs" color="gray.600">
-                                メイン: {selectedPlayer.player.mainRate}
-                              </Text>
-                              <Badge colorScheme={getRankColor(getRankFromRate(selectedPlayer.player.mainRate))} size="xs">
-                                {getRankFromRate(selectedPlayer.player.mainRate)}
-                              </Badge>
-                              <Text fontSize="xs" color="gray.600">
-                                サブ: {selectedPlayer.player.subRate}
-                              </Text>
-                              <Badge colorScheme={getRankColor(getRankFromRate(selectedPlayer.player.subRate))} size="xs">
-                                {getRankFromRate(selectedPlayer.player.subRate)}
-                              </Badge>
-                            </HStack>
-                          </VStack>
-                          <IconButton
-                            aria-label="Remove player"
-                            icon={<DeleteIcon />}
-                            size="sm"
-                            colorScheme="red"
-                            onClick={() => handleRemovePlayer(index)}
-                          />
-                        </HStack>
-                        <VStack spacing={3} align="stretch">
-                          <Text fontSize="sm" fontWeight="bold" color="red.600">
-                            絶対にやりたくないロール
-                          </Text>
-                          <Wrap spacing={2}>
-                            {Object.values(GameRole).map((role) => (
-                              <WrapItem key={role}>
-                                <Checkbox
-                                  isChecked={selectedPlayer.unwantedRoles.includes(role)}
-                                  onChange={() => handleUnwantedRoleToggle(index, role)}
-                                  colorScheme="red"
-                                >
-                                  <Tag
-                                    size="md"
-                                    variant={selectedPlayer.unwantedRoles.includes(role) ? "solid" : "outline"}
-                                    colorScheme="red"
-                                  >
-                                    <TagLabel>{role}</TagLabel>
-                                  </Tag>
-                                </Checkbox>
-                              </WrapItem>
-                            ))}
-                          </Wrap>
-                        </VStack>
-                        
-                        {selectedPlayer.player.tags && selectedPlayer.player.tags.length > 0 && (
-                          <Wrap spacing={1}>
-                            {selectedPlayer.player.tags.map((tag, tagIndex) => (
-                              <WrapItem key={tagIndex}>
-                                <Tag size="sm" variant="outline" colorScheme="blue">
-                                  <TagLabel>{tag}</TagLabel>
-                                </Tag>
-                              </WrapItem>
-                            ))}
-                          </Wrap>
-                        )}
-                      </VStack>
-                    </CardBody>
-                  </Card>
-                ))}
-
-                {selectedPlayers.length === 0 && (
-                  <Text textAlign="center" color="gray.500">
-                    プレイヤーを選択してください
-                  </Text>
-                )}
-
-                {selectedPlayers.length >= 10 && (
-                  <Text textAlign="center" color="red.500" fontWeight="bold">
-                    最大10人まで選択できます
-                  </Text>
-                )}
-              </VStack>
-            </CardBody>
-          </Card>
-        </SimpleGrid>
-
-
-        {/* フッター追従メニュー */}
-        <Box
-          position="fixed"
-          bottom="0"
-          left="0"
-          right="0"
-          bg="white"
-          borderTop="1px solid"
-          borderColor="gray.200"
-          p={3}
-          zIndex={1000}
-          boxShadow="0 -2px 10px rgba(0,0,0,0.1)"
-        >
-          <Container maxW="container.xl">
-            <Flex 
-              align="center" 
-              gap={3}
-              direction={{ base: 'column', md: 'row' }}
-            >
-              <VStack spacing={1} align={{ base: 'center', md: 'start' }}>
-                <Text fontSize="sm" fontWeight="bold" color="gray.700">
-                  選択されたプレイヤー: {selectedPlayers.length}/10人
-                </Text>
-                <RadioGroup
-                  value={roleSelectionMode}
-                  onChange={(value) => setRoleSelectionMode(value as RoleSelectionMode)}
-                >
-                  <HStack spacing={3} wrap="wrap" justify={{ base: 'center', md: 'start' }}>
-                    <Radio value="auto" size="sm">
-                      <Text fontSize="xs">ロール自動選択</Text>
-                    </Radio>
-                    <Radio value="manual" size="sm">
-                      <Text fontSize="xs">ロール手動選択</Text>
-                    </Radio>
-                  </HStack>
-                </RadioGroup>
-                <HStack spacing={2} align="center">
-                  <Text fontSize="xs" color="gray.600">
-                    レート差許容値:
-                  </Text>
-                  <Input
-                    type="number"
-                    value={rateDifferenceTolerance}
-                    onChange={(e) => setRateDifferenceTolerance(Number(e.target.value) || 0)}
-                    size="xs"
-                    width="60px"
-                    min={0}
-                    max={1000}
-                  />
-                  <Text fontSize="xs" color="gray.600">
-                    以下
-                  </Text>
-                </HStack>
-              </VStack>
-              <Spacer display={{ base: 'none', md: 'block' }} />
-              <HStack spacing={2}>
-                {teams && (
-                  <Button
-                    colorScheme="purple"
-                    onClick={onOpen}
-                    size="md"
-                    variant="outline"
-                  >
-                    チーム表示
-                  </Button>
-                )}
-                <Button
-                  colorScheme="blue"
-                  onClick={() => createTeams()}
-                  isDisabled={selectedPlayers.length < 10}
-                  size="md"
-                  minW={{ base: '100%', md: '180px' }}
-                >
-                  チーム作成
-                </Button>
-              </HStack>
-            </Flex>
-          </Container>
-        </Box>
-
-        {/* チーム表示モーダル */}
-        <Modal isOpen={isOpen} onClose={onClose} size="6xl" scrollBehavior="inside">
-          <ModalOverlay />
-          <ModalContent maxW="90vw" maxH="90vh">
-            <ModalHeader>
-              <HStack justify="space-between" align="center">
-                <Text>チーム構成</Text>
-                <HStack spacing={2}>
-                  <Button
-                    leftIcon={<RepeatIcon />}
-                    colorScheme="green"
-                    onClick={() => {
-                      if (!isMatchResultRegistered && window.confirm('試合結果を登録していませんが、チームを再生成しますか？')) {
-                        regenerateTeams()
-                      } else if (isMatchResultRegistered) {
-                        regenerateTeams()
-                      }
-                    }}
-                    size="sm"
-                  >
-                    チーム再生成
-                  </Button>
-                </HStack>
-              </HStack>
-            </ModalHeader>
-            <ModalCloseButton />
-            <ModalBody>
-              {teams && (
-                <VStack spacing={6} align="stretch">
-                  {/* レート差警告メッセージ */}
-                  {(() => {
-                    const exceedingRoles = getExceedingToleranceRoles(teams)
-                    if (exceedingRoles.length > 0) {
-                      return (
-                        <Card bg="orange.50" borderColor="orange.300" borderWidth="2px">
-                          <CardBody>
-                            <VStack spacing={2} align="stretch">
-                              <HStack>
-                                <Text fontWeight="bold" color="orange.700" fontSize="md">
-                                  警告: レート差が許容値を超えています
-                                </Text>
-                              </HStack>
-                              <Text fontSize="sm" color="orange.700">
-                                以下のロールでレート差が許容値（{rateDifferenceTolerance}）を超えています。プレイヤーの入れ替えやロール変更を検討してください。
-                              </Text>
-                              <Wrap spacing={2}>
-                                {exceedingRoles.map(role => {
-                                  const rateDiff = calculateRoleRateDifference(teams, role)
-                                  const bluePlayer = teams.blue.find(p => p.role === role)
-                                  const redPlayer = teams.red.find(p => p.role === role)
-                                  const blueRate = bluePlayer && bluePlayer.role === bluePlayer.player.mainRole 
-                                    ? bluePlayer.player.mainRate 
-                                    : bluePlayer?.player.subRate || 0
-                                  const redRate = redPlayer && redPlayer.role === redPlayer.player.mainRole 
-                                    ? redPlayer.player.mainRate 
-                                    : redPlayer?.player.subRate || 0
-                                  return (
-                                    <WrapItem key={role}>
-                                      <Tag size="md" colorScheme="orange" variant="solid">
-                                        <TagLabel>
-                                          {role}: {Math.min(blueRate, redRate)} vs {Math.max(blueRate, redRate)} (差: {rateDiff})
-                                        </TagLabel>
-                                      </Tag>
-                                    </WrapItem>
-                                  )
-                                })}
-                              </Wrap>
-                            </VStack>
-                          </CardBody>
-                        </Card>
-                      )
-                    }
-                    return null
-                  })()}
-                  <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={6}>
-                    {[
-                      { team: teams.blue, name: 'チーム1', color: 'blue' },
-                      { team: teams.red, name: 'チーム2', color: 'red' },
-                    ].map(({ team, name, color }) => (
-                      <Card key={name}>
-                        <VStack align="stretch" spacing={4}>
-                          <Heading size="md" color={`${color}.600`}>
-                            {name}
-                          </Heading>
-                          <Text fontSize="sm" color="gray.600" mb={2}>
-                            {isRoleAssignmentMode 
-                              ? 'プレイヤーをクリックするとロールとチームを変更できます。'
-                              : 'プレイヤーをクリックするとロールとチームを変更できます。'
-                            }
-                          </Text>
-                          <SimpleGrid columns={{ base: 1, sm: 2, md: 3 }} spacing={3}>
-                            {team.map((player, teamIndex) => {
-                              const exceedingRoles = getExceedingToleranceRoles(teams)
-                              const isExceeding = exceedingRoles.includes(player.role)
-                              return (
-                              <Card
-                                key={player.player.id}
-                                bg={isExceeding ? 'orange.100' : memberCardBg}
-                                borderWidth={isExceeding ? "2px" : "1px"}
-                                borderColor={isExceeding ? "orange.400" : undefined}
-                              >
-                                <Menu>
-                                  <MenuButton as={Box} cursor="pointer" w="100%" h="100%">
-                                    <VStack align="stretch" spacing={1}>
-                                      <VStack align="start" spacing={0}>
-                                        <Text fontWeight="bold">{player.player.nickname || player.player.name}</Text>
-                                        {player.player.nickname && (
-                                          <Text fontSize="xs" color="gray.500">
-                                            {player.player.name}
-                                          </Text>
-                                        )}
-                                      </VStack>
-                                      <Badge
-                                        colorScheme={getRoleColor(player.role)}
-                                      >
-                                        {player.role}
-                                      </Badge>
-                                      <VStack spacing={1} align="stretch">
-                                        <Text fontSize="sm" color="gray.500">
-                                          レート: {player.role === player.player.mainRole ? player.player.mainRate : player.player.subRate}
-                                        </Text>
-                                        <Badge 
-                                          colorScheme={getRankColor(getRankFromRate(player.role === player.player.mainRole ? player.player.mainRate : player.player.subRate))} 
-                                          size="sm"
-                                          alignSelf="center"
-                                        >
-                                          {getRankFromRate(player.role === player.player.mainRole ? player.player.mainRate : player.player.subRate)}
-                                        </Badge>
-                                        {isExceeding && (
-                                          <Text fontSize="xs" color="orange.600" fontWeight="bold" textAlign="center" mt={1}>
-                                            レート差超過
-                                          </Text>
-                                        )}
-                                      </VStack>
-                                    </VStack>
-                                  </MenuButton>
-                                  <MenuList>
-                                    <HStack align="start" spacing={0}>
-                                      {isRoleAssignmentMode && (
-                                        <Box flex="1" borderRight="1px solid" borderColor="gray.200">
-                                          <MenuGroup title="ロール変更">
-                                            <Box p={2}>
-                                              <VStack spacing={1} align="stretch">
-                                                {Object.values(GameRole).map((role) => {
-                                                  const currentRate = player.role === player.player.mainRole ? 
-                                                    player.player.mainRate : 
-                                                    player.player.subRate
-                                                  const newRate = role === player.player.mainRole ? 
-                                                    player.player.mainRate : 
-                                                    player.player.subRate
-                                                  const diff = newRate - currentRate
-                                                  
-                                                  return (
-                                                    <MenuItem
-                                                      key={role}
-                                                      onClick={() => {
-                                                        const currentTeamKey = name === 'チーム1' ? 'blue' : 'red'
-                                                        handleRoleChange(currentTeamKey, teamIndex, role)
-                                                      }}
-                                                      isDisabled={player.role === role}
-                                                      minH="auto"
-                                                      py={2}
-                                                    >
-                                                      <HStack justify="space-between" w="100%">
-                                                        <VStack align="start" spacing={0}>
-                                                          <Text fontSize="sm" fontWeight="bold">
-                                                            {role}
-                                                          </Text>
-                                                          <Text fontSize="xs" color="gray.500">
-                                                            レート: {newRate}
-                                                          </Text>
-                                                        </VStack>
-                                                        {diff !== 0 && (
-                                                          <Text fontSize="xs" color={diff > 0 ? 'green.500' : 'red.500'}>
-                                                            {diff > 0 ? '+' : ''}{diff}
-                                                          </Text>
-                                                        )}
-                                                      </HStack>
-                                                    </MenuItem>
-                                                  )
-                                                })}
-                                              </VStack>
-                                            </Box>
-                                          </MenuGroup>
-                                        </Box>
-                                      )}
-                                      <Box flex="1">
-                                        <MenuGroup title={`${name === 'チーム1' ? 'チーム2' : 'チーム1'}と交代`}>
-                                          <Box p={2}>
-                                            <VStack spacing={1} align="stretch">
-                                              {(name === 'チーム1' ? teams.red : teams.blue).map((otherPlayer, otherIndex) => (
-                                                <MenuItem
-                                                  key={otherPlayer.player.id}
-                                                  onClick={() => {
-                                                    const otherTeamKey = name === 'チーム1' ? 'red' : 'blue'
-                                                    const currentTeamKey = name === 'チーム1' ? 'blue' : 'red'
-                                                    handleSwapPlayers(currentTeamKey, teamIndex, otherTeamKey, otherIndex)
-                                                  }}
-                                                  minH="auto"
-                                                  py={2}
-                                                >
-                                                  <HStack justify="space-between" w="100%">
-                                                    <VStack align="start" spacing={0}>
-                                                      <Text fontSize="sm" fontWeight="bold">
-                                                        {otherPlayer.player.nickname || otherPlayer.player.name}
-                                                      </Text>
-                                                      {otherPlayer.player.nickname && (
-                                                        <Text fontSize="xs" color="gray.400">
-                                                          {otherPlayer.player.name}
-                                                        </Text>
-                                                      )}
-                                                      <Text fontSize="xs" color="gray.500">
-                                                        {otherPlayer.role}
-                                                      </Text>
-                                                    </VStack>
-                                                    {(() => {
-                                                      const currentRate = player.role === player.player.mainRole ? 
-                                                        player.player.mainRate : 
-                                                        player.player.subRate
-                                                      const otherRate = otherPlayer.role === otherPlayer.player.mainRole ? 
-                                                        otherPlayer.player.mainRate : 
-                                                        otherPlayer.player.subRate
-                                                      const diff = otherRate - currentRate
-                                                      return (
-                                                        <Text fontSize="xs" color={diff > 0 ? 'green.500' : diff < 0 ? 'red.500' : 'gray.500'}>
-                                                          {diff > 0 ? '+' : ''}{diff}
-                                                        </Text>
-                                                      )
-                                                    })()}
-                                                  </HStack>
-                                                </MenuItem>
-                                              ))}
-                                            </VStack>
-                                          </Box>
-                                        </MenuGroup>
-                                      </Box>
-                                    </HStack>
-                                  </MenuList>
-                                </Menu>
-                              </Card>
-                            )})}
-                          </SimpleGrid>
-                          <Divider />
-                          <HStack justify="space-between">
-                            <Text fontWeight="bold">平均レート:</Text>
-                            <Text>{calculateAverageRate(team)}</Text>
-                          </HStack>
-                        </VStack>
-                      </Card>
+        <section className="panel right-panel">
+          <div className="panel-hd">
+            <h2>選択中</h2>
+            <span className="count" style={{ color: remain === 0 ? 'var(--ok)' : 'var(--fg-3)' }}>{selected.length} / 10</span>
+          </div>
+          <div className="panel-body">
+            {selected.length === 0 && <div className="empty-msg">左のリストからプレイヤーを<br />クリックして選択（最大10人）</div>}
+            {selected.map((sp, i) => (
+              <div className="roster-slot" key={sp.player.id}>
+                <div className="rs-row">
+                  <span className="roster-num">{String(i + 1).padStart(2, '0')}</span>
+                  <RoleBadge role={sp.player.mainRole} />
+                  <div className="rs-name-block">
+                    <div className="rs-pname">{sp.player.nickname || sp.player.name}</div>
+                    {sp.player.nickname && <div className="rs-sname">{sp.player.name}</div>}
+                  </div>
+                  <div className="rs-rates"><span>M<strong>{sp.player.mainRate}</strong></span><span>S<strong>{sp.player.subRate}</strong></span></div>
+                  <div className="rs-ng-row">
+                    {ROLES.map((role) => (
+                      <button key={role} className={`uw-btn${sp.unwantedRoles.includes(role) ? ' uw-on' : ''}`} onClick={() => toggleUnwanted(i, role)}>{role}</button>
                     ))}
-                  </SimpleGrid>
+                  </div>
+                  <button className="remove-btn" onClick={() => removePlayer(i)}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg></button>
+                </div>
+              </div>
+            ))}
+            {selected.length > 0 &&
+              Array.from({ length: Math.max(0, 10 - selected.length) }, (_, i) => (
+                <div className="empty-slot" key={i}>{String(selected.length + i + 1).padStart(2, '0')} · プレイヤーを選択</div>
+              ))}
+          </div>
+        </section>
+      </div>
 
-                  <Card>
-                    <VStack spacing={4} align="stretch">
-                      <Heading size="md" color="gray.700" textAlign="center">
-                        試合結果
-                      </Heading>
-                      <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
-                        <Button
-                          colorScheme="blue"
-                          onClick={() => handleMatchResult('BLUE')}
-                          size="lg"
-                          width="100%"
-                        >
-                          チーム1の勝利
-                        </Button>
-                        <Button
-                          colorScheme="red"
-                          onClick={() => handleMatchResult('RED')}
-                          size="lg"
-                          width="100%"
-                        >
-                          チーム2の勝利
-                        </Button>
-                      </SimpleGrid>
-                      <Button
-                        colorScheme="purple"
-                        as="a"
-                        href="https://draftlol.dawe.gg/"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        size="lg"
-                        width="100%"
-                      >
-                        ドラフトツール
-                      </Button>
-                    </VStack>
-                  </Card>
-                </VStack>
-              )}
-            </ModalBody>
-          </ModalContent>
-        </Modal>
-      </VStack>
-    </Layout>
+      <div className="action-footer">
+        <div className="footer-inner">
+          <div className="progress-wrap">
+            <div className="prog-dots">{Array.from({ length: 10 }, (_, i) => <div key={i} className={`prog-dot${i < selected.length ? i < 5 ? ' blue' : ' red' : ''}`} />)}</div>
+            <span className="prog-text"><span className="prog-n">{selected.length}/10</span>{remain > 0 ? <span className="prog-remain">— あと{remain}人</span> : <span className="ready">準備完了</span>}</span>
+          </div>
+          <div className="mode-toggle">
+            <button className={`mode-btn${mode === 'auto' ? ' active' : ''}`} onClick={() => setMode('auto')}>ロール自動</button>
+            <button className={`mode-btn${mode === 'manual' ? ' active' : ''}`} onClick={() => setMode('manual')}>手動</button>
+          </div>
+          <div className="tol-wrap"><span className="tol-lbl">許容差</span><input className="tol-input" type="number" min={0} max={1000} step={50} value={tolerance} onChange={(e) => setTolerance(Number(e.target.value) || 0)} /></div>
+          <div className="spacer" />
+          {teams && !showOverlay && <button className="btn-ghost" onClick={() => setShowOverlay(true)}>チーム表示</button>}
+          <button className="btn-primary" disabled={selected.length < 10} onClick={createTeams}>{selected.length < 10 ? `チーム作成 (${selected.length}/10)` : 'チーム作成'}</button>
+        </div>
+      </div>
+
+      {showOverlay && teams && (
+        <div className="overlay">
+          <div className="ov-hd">
+            <h2>チーム構成</h2>
+            <span className="ov-help">クリックして選択 → 別プレイヤーをクリックして交代</span>
+            <div className="ov-actions">
+              <button className="regen-btn" onClick={() => { setTeams(buildTeams(selected)); setResult(null); setSwapSource(null) }}>再生成</button>
+              <button className="icon-btn" onClick={() => setShowOverlay(false)}>✕</button>
+            </div>
+          </div>
+          <div className="ov-stats">
+            <div className="ov-stat-side">
+              <div className="stat-block"><div className="sv blue">{getAvgRate(teams.blue)}</div><div className="sk">Blue avg rate</div></div>
+              <div className="stat-block"><div className="sv sub">{getTotalRate(teams.blue)}</div><div className="sk">Total</div></div>
+            </div>
+            <div className="ov-stat-mid"><div className="total-diff"><div className={`td-n ${totalDiff > tolerance ? 'warn' : 'ok'}`}>Δ{totalDiff}</div><div className="td-k">total diff</div></div></div>
+            <div className="ov-stat-side right">
+              <div className="stat-block right"><div className="sv sub">{getTotalRate(teams.red)}</div><div className="sk">Total</div></div>
+              <div className="stat-block right"><div className="sv red">{getAvgRate(teams.red)}</div><div className="sk">Red avg rate</div></div>
+            </div>
+          </div>
+          <div className="ov-body">
+            {swapSource && <div className="swap-banner"><strong>{teams[swapSource.team][swapSource.idx].player.nickname || teams[swapSource.team][swapSource.idx].player.name}</strong> を選択中 <button className="swap-cancel" onClick={() => setSwapSource(null)}>キャンセル</button></div>}
+            {ROLES.map((role) => {
+              const { tp: bTp, idx: bIdx } = byRole('blue', role)
+              const { tp: rTp, idx: rIdx } = byRole('red', role)
+              const diff = bTp && rTp ? Math.abs(getRateForRole(bTp.player, role) - getRateForRole(rTp.player, role)) : 0
+              const isWarn = diff > tolerance
+              const isSrcBlue = swapSource?.team === 'blue' && swapSource?.id === bTp?.player.id
+              const isSrcRed = swapSource?.team === 'red' && swapSource?.id === rTp?.player.id
+              return (
+                <div className="role-row" key={role}>
+                  <div className={`rr-card blue-card${isSrcBlue ? ' is-source' : ''}${swapSource && !isSrcBlue ? ' is-target' : ''}`} onClick={() => bIdx >= 0 && handleSwapClick('blue', bIdx)}>
+                    <div className="rr-info"><div className="rr-line1"><span className="rr-name">{bTp?.player.nickname || bTp?.player.name || '—'}</span><span className="rr-sub">{bTp && bTp.role === bTp.player.mainRole ? 'メイン' : 'サブ'}</span></div><div className="rr-line2"><span className="rr-rate blue">{bTp ? getRateForRole(bTp.player, bTp.role) : '-'}</span></div></div>
+                  </div>
+                  <div className="rr-center"><div className={`rr-role-btn ${role}`}>{role}</div><div className={`rr-diff ${isWarn ? 'warn' : 'ok'}`}>Δ {diff}</div></div>
+                  <div className={`rr-card red-card${isSrcRed ? ' is-source' : ''}${swapSource && !isSrcRed ? ' is-target' : ''}`} onClick={() => rIdx >= 0 && handleSwapClick('red', rIdx)}>
+                    <div className="rr-info"><div className="rr-line1"><span className="rr-sub">{rTp && rTp.role === rTp.player.mainRole ? 'メイン' : 'サブ'}</span><span className="rr-name">{rTp?.player.nickname || rTp?.player.name || '—'}</span></div><div className="rr-line2"><span className="rr-rate red">{rTp ? getRateForRole(rTp.player, rTp.role) : '-'}</span></div></div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="result-bar">
+            <span className="res-lbl">結果登録:</span>
+            <button className={`win-btn blue ${result === 'BLUE' ? 'won-blue' : ''}`} onClick={() => registerMatch('BLUE')}>{result === 'BLUE' ? '✓ ' : ''}BLUE WIN</button>
+            <button className={`win-btn red ${result === 'RED' ? 'won-red' : ''}`} onClick={() => registerMatch('RED')}>{result === 'RED' ? '✓ ' : ''}RED WIN</button>
+            <a className="draft-btn" href="https://draftlol.dawe.gg/" target="_blank" rel="noopener noreferrer">Draft Tool</a>
+          </div>
+        </div>
+      )}
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        .page-layout{max-width:1440px;margin:0 auto;display:grid;grid-template-columns:400px 1fr;height:calc(100vh - 57px - 68px);overflow:hidden}
+        .panel{border-right:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden}
+        .right-panel{border-right:0}
+        .panel-hd{padding:16px 20px 12px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+        .panel-hd h2{font-family:'Space Grotesk';font-size:15px;font-weight:600;margin:0}
+        .panel-hd .count{font-family:'JetBrains Mono';font-size:12px;color:var(--fg-3)}
+        .panel-body{flex:1;overflow-y:auto;padding:10px;scrollbar-width:thin;scrollbar-color:var(--line-2) transparent}
+        .search-area{padding:10px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+        .search-row{position:relative}
+        .search-row input{width:100%;padding:9px 12px 9px 36px;background:var(--bg-1);border:1px solid var(--line);border-radius:9px;color:var(--fg-0);font-size:13.5px;outline:none}
+        .search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--fg-3)}
+        .tag-row{display:flex;gap:5px;flex-wrap:wrap}
+        .tag-chip{font-family:'JetBrains Mono';font-size:10px;letter-spacing:.08em;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--fg-2)}
+        .tag-chip.active{background:color-mix(in oklch,var(--blue) 18%,transparent);border-color:var(--blue-d);color:var(--blue)}
+        .pool-card{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid transparent;margin-bottom:5px;background:var(--bg-1);transition:all .12s;cursor:pointer}
+        .pool-card:hover:not(.pool-selected){background:var(--bg-2);border-color:var(--line);transform:translateX(2px)}
+        .pool-card.pool-selected{opacity:.38;cursor:not-allowed}
+        .pool-card.just-added{animation:addedFlash .4s ease}
+        @keyframes addedFlash{0%{background:color-mix(in oklch,var(--blue) 25%,var(--bg-1));border-color:var(--blue)}100%{background:var(--bg-1);border-color:transparent}}
+        .card-info{flex:1;min-width:0}.name{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .sub-name{font-size:11px;color:var(--fg-3);font-family:'JetBrains Mono';margin-top:1px}
+        .rates{font-family:'JetBrains Mono';font-size:11px;color:var(--fg-2);margin-top:4px;display:flex;gap:8px;align-items:center}
+        .rates strong{color:var(--fg-1)} .rates .dot{color:var(--line-2)} .rates .rank{color:var(--fg-3)}
+        .add-icon{color:var(--fg-3)}
+        .roster-slot{background:var(--bg-1);border:1px solid var(--line);border-radius:8px;margin-bottom:4px}
+        .rs-row{display:flex;align-items:center;gap:10px;padding:11px 14px}
+        .roster-num{font-family:'JetBrains Mono';font-size:11px;color:var(--fg-3);width:18px}
+        .rs-name-block{flex:1;min-width:0}.rs-pname{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+        .rs-sname{font-family:'JetBrains Mono';font-size:11px;color:var(--fg-3)}
+        .rs-rates{font-family:'JetBrains Mono';font-size:12px;color:var(--fg-2);display:flex;gap:10px}
+        .rs-rates strong{color:var(--fg-1);margin-left:3px}
+        .rs-ng-row{display:flex;gap:3px}
+        .uw-btn{font-family:'JetBrains Mono';font-size:9.5px;padding:3px 0;border-radius:4px;border:1px solid var(--line);background:transparent;color:var(--fg-3);width:46px}
+        .uw-btn.uw-on{background:color-mix(in oklch,var(--red) 14%,transparent);border-color:var(--red-d);color:var(--red)}
+        .remove-btn{width:24px;height:24px;border-radius:5px;background:transparent;border:1px solid var(--line);color:var(--fg-3);display:grid;place-items:center}
+        .empty-msg{padding:40px 16px;text-align:center;color:var(--fg-3);font-family:'JetBrains Mono';font-size:12px;line-height:1.6}
+        .empty-slot{padding:9px 12px;text-align:center;font-family:'JetBrains Mono';font-size:10.5px;color:var(--fg-3);letter-spacing:.05em;border:1px dashed var(--line);border-radius:8px;margin-bottom:4px}
+        .action-footer{position:fixed;bottom:0;left:0;right:0;z-index:40;background:color-mix(in oklch,var(--bg-0) 94%,transparent);backdrop-filter:blur(16px);border-top:1px solid var(--line)}
+        .footer-inner{max-width:1440px;margin:0 auto;padding:0 28px;display:flex;align-items:center;gap:16px;height:68px}
+        .progress-wrap{display:flex;align-items:center;gap:10px}.prog-dots{display:flex;gap:4px}.prog-dot{width:9px;height:9px;border-radius:2px;background:var(--line-2)}.prog-dot.blue{background:var(--blue)}.prog-dot.red{background:var(--red)}
+        .prog-text{font-family:'JetBrains Mono';font-size:12px}.prog-n{color:var(--fg-0);font-weight:600}.prog-remain{color:var(--fg-2);margin-left:6px}.ready{color:var(--ok);margin-left:6px}
+        .mode-toggle{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}.mode-btn{padding:7px 14px;font-size:12px;background:transparent;border:0;color:var(--fg-2)}.mode-btn.active{background:var(--bg-2);color:var(--fg-0)}
+        .tol-wrap{display:flex;align-items:center;gap:7px}.tol-lbl{font-family:'JetBrains Mono';font-size:11px;color:var(--fg-3)}.tol-input{width:64px;padding:6px 8px;border-radius:7px;background:var(--bg-1);border:1px solid var(--line);color:var(--fg-0);font-family:'JetBrains Mono';text-align:center}
+        .spacer{flex:1}.btn-ghost{padding:10px 20px;border-radius:9px;background:transparent;border:1px solid var(--line-2);color:var(--fg-1);font-family:'Space Grotesk';font-weight:600;font-size:13.5px}
+        .btn-primary{padding:11px 28px;border-radius:9px;border:0;background:var(--fg-0);color:var(--bg-0);font-family:'Space Grotesk';font-weight:700;font-size:14px}
+        .btn-primary:disabled{opacity:.28;cursor:not-allowed}
+        .overlay{position:fixed;inset:0;z-index:100;background:var(--bg-0);display:flex;flex-direction:column}
+        .ov-hd{display:flex;align-items:center;padding:14px 28px;border-bottom:1px solid var(--line);gap:14px}.ov-hd h2{font-family:'Space Grotesk';font-size:17px;margin:0}.ov-help{font-family:'JetBrains Mono';font-size:11px;color:var(--fg-3)}
+        .ov-actions{margin-left:auto;display:flex;gap:8px}.icon-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--fg-2)}.regen-btn{padding:8px 15px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--fg-1)}
+        .ov-stats{display:grid;grid-template-columns:1fr auto 1fr;border-bottom:1px solid var(--line);background:linear-gradient(to right,color-mix(in oklch,var(--blue-bg) 35%,transparent),var(--bg-0) 50%,color-mix(in oklch,var(--red-bg) 35%,transparent))}
+        .ov-stat-side{padding:16px 28px;display:flex;gap:24px;align-items:center}.ov-stat-side.right{justify-content:flex-end}.stat-block{display:flex;flex-direction:column}.stat-block.right{align-items:flex-end}
+        .sv{font-family:'Space Grotesk';font-size:28px;font-weight:600}.sv.blue{color:var(--blue)}.sv.red{color:var(--red)}.sv.sub{color:var(--fg-2)}.sk{font-family:'JetBrains Mono';font-size:10px;color:var(--fg-3);text-transform:uppercase;letter-spacing:.14em;margin-top:2px}
+        .ov-stat-mid{display:flex;align-items:center;justify-content:center;padding:0 20px;border-left:1px solid var(--line);border-right:1px solid var(--line)}
+        .total-diff{font-family:'JetBrains Mono';font-size:13px;display:flex;flex-direction:column;align-items:center;gap:2px}.td-n{font-size:20px;font-weight:600}.td-n.ok{color:var(--ok)}.td-n.warn{color:var(--warn)}.td-k{font-size:10px;color:var(--fg-3);letter-spacing:.1em;text-transform:uppercase}
+        .ov-body{flex:1;overflow-y:auto;padding:12px 28px;display:flex;flex-direction:column;gap:8px}
+        .swap-banner{background:color-mix(in oklch,var(--gold) 10%,var(--bg-1));border:1px solid color-mix(in oklch,var(--gold) 40%,transparent);border-radius:10px;padding:10px 16px;font-family:'JetBrains Mono';font-size:12px;color:var(--gold);display:flex;align-items:center;gap:10px}
+        .swap-cancel{margin-left:auto;background:transparent;border:1px solid color-mix(in oklch,var(--gold) 40%,transparent);color:var(--gold);border-radius:5px;padding:3px 10px;font-family:'JetBrains Mono';font-size:10px}
+        .role-row{display:grid;grid-template-columns:1fr 84px 1fr;gap:8px;align-items:stretch}
+        .rr-card{background:var(--bg-1);border:1px solid var(--line);border-radius:10px;padding:14px 20px;display:flex;align-items:center;gap:14px;height:100%}
+        .rr-card.blue-card{border-left:3px solid var(--blue-d)}.rr-card.red-card{border-right:3px solid var(--red-d);flex-direction:row-reverse}
+        .rr-card.is-source{border-color:var(--gold);box-shadow:0 0 0 1px var(--gold)}.rr-card.is-target{border-style:dashed}
+        .rr-info{flex:1;min-width:0}.rr-line1{display:flex;align-items:baseline;gap:6px}.rr-card.red-card .rr-line1{flex-direction:row-reverse}
+        .rr-name{font-weight:600;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rr-sub{font-family:'JetBrains Mono';font-size:11px;color:var(--fg-3)}
+        .rr-line2{display:flex;align-items:baseline;gap:8px;margin-top:6px}.rr-card.red-card .rr-line2{flex-direction:row-reverse}
+        .rr-rate{font-family:'JetBrains Mono';font-size:22px;font-weight:600}.rr-rate.blue{color:var(--blue)}.rr-rate.red{color:var(--red)}
+        .rr-center{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px}
+        .rr-role-btn{font-family:'JetBrains Mono';font-size:11px;font-weight:600;padding:6px 10px;border-radius:8px;width:84px;text-align:center;background:var(--bg-2);border:1px solid var(--line)}
+        .rr-diff{font-family:'JetBrains Mono';font-size:12px;font-weight:600;padding:3px 8px;border-radius:5px}
+        .rr-diff.ok{background:color-mix(in oklch,var(--ok) 15%,transparent);color:var(--ok)}.rr-diff.warn{background:color-mix(in oklch,var(--warn) 15%,transparent);color:var(--warn)}
+        .result-bar{border-top:1px solid var(--line);padding:14px 28px;display:flex;align-items:center;gap:10px}
+        .res-lbl{font-family:'JetBrains Mono';font-size:11px;color:var(--fg-3)}.win-btn{flex:1;padding:14px;border-radius:11px;border:1px solid var(--line);background:transparent;font-family:'Space Grotesk';font-weight:700;font-size:16px}
+        .win-btn.blue{color:var(--blue)}.win-btn.red{color:var(--red)}.win-btn.won-blue{background:color-mix(in oklch,var(--blue) 22%,transparent);border-color:var(--blue)}.win-btn.won-red{background:color-mix(in oklch,var(--red) 22%,transparent);border-color:var(--red)}
+        .draft-btn{display:flex;align-items:center;justify-content:center;padding:14px 22px;border-radius:11px;border:1px solid var(--line-2);background:transparent;color:var(--fg-1);font-family:'Space Grotesk';font-weight:600;font-size:15px;text-decoration:none;white-space:nowrap}
+        @media (max-width:1100px){.page-layout{grid-template-columns:1fr;height:auto;padding-bottom:68px}.footer-inner{padding:10px 14px;height:auto;flex-wrap:wrap}.role-row{grid-template-columns:1fr}.ov-help{display:none}}
+      ` }} />
+    </div>
   )
-} 
+}

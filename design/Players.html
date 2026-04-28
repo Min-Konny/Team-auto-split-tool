@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Players — LoL Team Maker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --bg-0: oklch(0.16 0.02 250);
+  --bg-1: oklch(0.20 0.022 250);
+  --bg-2: oklch(0.24 0.024 250);
+  --bg-3: oklch(0.28 0.026 250);
+  --line: oklch(0.30 0.02 250);
+  --line-2: oklch(0.40 0.025 250);
+  --fg-0: oklch(0.96 0.01 250);
+  --fg-1: oklch(0.78 0.015 250);
+  --fg-2: oklch(0.58 0.018 250);
+  --fg-3: oklch(0.42 0.02 250);
+  --blue: oklch(0.72 0.16 240);
+  --blue-d: oklch(0.42 0.14 240);
+  --blue-bg: oklch(0.22 0.07 240);
+  --red: oklch(0.68 0.20 25);
+  --red-d: oklch(0.42 0.17 25);
+  --red-bg: oklch(0.22 0.10 25);
+  --gold: oklch(0.82 0.13 85);
+  --ok: oklch(0.76 0.16 145);
+  --warn: oklch(0.78 0.15 65);
+  --r-top: oklch(0.72 0.18 25);
+  --r-jng: oklch(0.76 0.16 145);
+  --r-mid: oklch(0.72 0.16 240);
+  --r-adc: oklch(0.72 0.18 305);
+  --r-sup: oklch(0.80 0.15 70);
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { background: var(--bg-0); color: var(--fg-0); font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+
+/* topbar */
+.topbar { position: sticky; top: 0; z-index: 50; backdrop-filter: blur(18px); background: color-mix(in oklch, var(--bg-0) 85%, transparent); border-bottom: 1px solid var(--line); }
+.topbar-inner { max-width: 1440px; margin: 0 auto; padding: 12px 28px; display: flex; align-items: center; justify-content: space-between; }
+.brand { display: flex; align-items: center; gap: 10px; font-family: 'Space Grotesk'; font-weight: 600; font-size: 15px; text-decoration: none; color: inherit; }
+.brand-mark { width: 26px; height: 26px; position: relative; }
+.brand-mark::before, .brand-mark::after { content: ""; position: absolute; inset: 0; border-radius: 3px; }
+.brand-mark::before { background: linear-gradient(135deg, var(--blue), var(--blue-d)); clip-path: polygon(0 0,100% 0,100% 100%,50% 100%,0 50%); }
+.brand-mark::after  { background: linear-gradient(135deg, var(--red-d), var(--red)); clip-path: polygon(50% 100%,100% 100%,100% 50%); }
+.brand-sub { font-family: 'JetBrains Mono'; font-size: 10px; color: var(--fg-3); letter-spacing: 0.12em; text-transform: uppercase; margin-left: 4px; }
+.nav { display: flex; gap: 2px; }
+.nav a { padding: 7px 14px; border-radius: 999px; color: var(--fg-1); font-size: 13px; text-decoration: none; transition: background 0.15s, color 0.15s; }
+.nav a:hover { background: var(--bg-2); color: var(--fg-0); }
+.nav a.active { background: var(--bg-2); color: var(--fg-0); }
+
+/* page content */
+.page { max-width: 1440px; margin: 0 auto; padding: 28px 28px 60px; }
+.page-hd { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+.page-hd h1 { font-family: 'Space Grotesk'; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin: 0; }
+.page-hd .count-tag { font-family: 'JetBrains Mono'; font-size: 12px; color: var(--fg-3); margin-left: 12px; }
+.btn-add {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 20px; border-radius: 9px; border: 0;
+  background: var(--fg-0); color: var(--bg-0);
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 13.5px;
+  cursor: pointer; transition: all 0.15s;
+}
+.btn-add:hover { background: var(--gold); }
+
+/* search + filter bar */
+.filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+.search-wrap { position: relative; }
+.search-wrap input { width: 280px; padding: 9px 12px 9px 36px; background: var(--bg-1); border: 1px solid var(--line); border-radius: 9px; color: var(--fg-0); font-family: inherit; font-size: 13.5px; outline: none; transition: border-color 0.15s; }
+.search-wrap input::placeholder { color: var(--fg-3); }
+.search-wrap input:focus { border-color: var(--line-2); }
+.search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--fg-3); pointer-events: none; }
+.sort-select { padding: 8px 12px; background: var(--bg-1); border: 1px solid var(--line); border-radius: 9px; color: var(--fg-1); font-family: 'JetBrains Mono'; font-size: 12px; outline: none; cursor: pointer; }
+.tag-chips { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+.tag-chip { font-family: 'JetBrains Mono'; font-size: 10px; letter-spacing: 0.08em; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--fg-2); cursor: pointer; transition: all 0.12s; }
+.tag-chip:hover { border-color: var(--line-2); color: var(--fg-1); }
+.tag-chip.active { background: color-mix(in oklch, var(--blue) 18%, transparent); border-color: var(--blue-d); color: var(--blue); }
+
+/* role badge */
+.role-badge { font-family: 'JetBrains Mono'; font-size: 10px; font-weight: 600; padding: 3px 0; border-radius: 5px; letter-spacing: 0.05em; width: 58px; text-align: center; display: inline-block; background: var(--bg-2); }
+.role-badge.TOP    { color: var(--r-top); border: 1px solid color-mix(in oklch, var(--r-top) 35%, transparent); }
+.role-badge.JUNGLE { color: var(--r-jng); border: 1px solid color-mix(in oklch, var(--r-jng) 35%, transparent); }
+.role-badge.MID    { color: var(--r-mid); border: 1px solid color-mix(in oklch, var(--r-mid) 35%, transparent); }
+.role-badge.ADC    { color: var(--r-adc); border: 1px solid color-mix(in oklch, var(--r-adc) 35%, transparent); }
+.role-badge.SUP    { color: var(--r-sup); border: 1px solid color-mix(in oklch, var(--r-sup) 35%, transparent); }
+.role-badge.sm { font-size: 9px; width: 48px; padding: 2px 0; }
+
+/* rank chip */
+.rank-chip { font-family: 'JetBrains Mono'; font-size: 10px; padding: 2px 7px; border-radius: 4px; background: var(--bg-2); white-space: nowrap; }
+
+/* table */
+.tbl-wrap { background: var(--bg-1); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.tbl-hd { display: grid; grid-template-columns: 220px 72px 140px 160px 80px 110px 90px 90px; align-items: center; padding: 0 14px; border-bottom: 1px solid var(--line); background: var(--bg-2); }
+.tbl-hd .th { font-family: 'JetBrains Mono'; font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--fg-3); padding: 11px 8px; }
+.tbl-hd .th.num { text-align: right; }
+.tbl-row { display: grid; grid-template-columns: 220px 72px 140px 160px 80px 110px 90px 90px; align-items: center; padding: 0 14px; border-bottom: 1px solid var(--line); cursor: pointer; transition: background 0.12s; }
+.tbl-row:last-child { border-bottom: 0; }
+.tbl-row:hover { background: var(--bg-2); }
+.td { padding: 10px 8px; }
+.td.num { text-align: right; }
+
+/* player name cell */
+.player-name { font-weight: 600; font-size: 14px; }
+.player-sub  { font-family: 'JetBrains Mono'; font-size: 11px; color: var(--fg-3); margin-top: 1px; }
+
+/* rate cell */
+.rate-main { font-family: 'JetBrains Mono'; font-size: 15px; font-weight: 600; color: var(--fg-0); }
+.rate-sub  { font-family: 'JetBrains Mono'; font-size: 12px; color: var(--fg-2); margin-top: 3px; }
+
+/* win rate cell */
+.wr-num { font-family: 'JetBrains Mono'; font-size: 15px; font-weight: 600; }
+.wr-bar { height: 3px; border-radius: 2px; background: var(--line); margin-top: 4px; overflow: hidden; }
+.wr-fill { height: 100%; border-radius: 2px; }
+.wr-record { font-family: 'JetBrains Mono'; font-size: 10px; color: var(--fg-3); margin-top: 2px; }
+
+/* ng role chips */
+.ng-wrap { display: flex; gap: 3px; flex-wrap: wrap; }
+.ng-chip { font-family: 'JetBrains Mono'; font-size: 9.5px; padding: 2px 6px; border-radius: 4px; background: color-mix(in oklch, var(--red) 14%, transparent); border: 1px solid var(--red-d); color: var(--red); }
+
+/* action buttons */
+.act-row { display: flex; gap: 5px; justify-content: flex-end; }
+.icon-btn { width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--line); background: transparent; color: var(--fg-2); cursor: pointer; display: grid; place-items: center; transition: all 0.12s; }
+.icon-btn:hover { background: var(--bg-3); color: var(--fg-0); border-color: var(--line-2); }
+.icon-btn.del:hover { background: color-mix(in oklch, var(--red) 15%, transparent); border-color: var(--red-d); color: var(--red); }
+.icon-btn.hist:hover { background: color-mix(in oklch, var(--r-adc) 15%, transparent); border-color: var(--r-adc); color: var(--r-adc); }
+
+/* ── MODAL ── */
+.modal-backdrop { position: fixed; inset: 0; z-index: 100; background: color-mix(in oklch, var(--bg-0) 80%, transparent); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 24px; animation: fadeIn 0.15s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal { background: var(--bg-1); border: 1px solid var(--line-2); border-radius: 16px; width: 100%; max-width: 560px; max-height: calc(100vh - 48px); display: flex; flex-direction: column; animation: scaleIn 0.18s ease; }
+@keyframes scaleIn { from { transform: scale(0.97); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.modal.wide { max-width: 700px; }
+.modal-hd { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--line); flex-shrink: 0; }
+.modal-hd h3 { font-family: 'Space Grotesk'; font-size: 16px; font-weight: 600; margin: 0; letter-spacing: -0.01em; }
+.modal-body { flex: 1; overflow-y: auto; padding: 20px 22px; display: flex; flex-direction: column; gap: 18px; scrollbar-width: thin; scrollbar-color: var(--line-2) transparent; }
+.modal-ft { display: flex; gap: 10px; justify-content: flex-end; padding: 14px 22px; border-top: 1px solid var(--line); flex-shrink: 0; }
+.modal-close { width: 32px; height: 32px; border-radius: 7px; border: 1px solid var(--line); background: transparent; color: var(--fg-2); cursor: pointer; display: grid; place-items: center; transition: all 0.12s; }
+.modal-close:hover { background: var(--bg-2); color: var(--fg-0); }
+
+/* form controls */
+.form-group { display: flex; flex-direction: column; gap: 6px; }
+.form-label { font-family: 'JetBrains Mono'; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--fg-3); }
+.form-input { padding: 10px 12px; background: var(--bg-0); border: 1px solid var(--line); border-radius: 9px; color: var(--fg-0); font-family: inherit; font-size: 14px; outline: none; transition: border-color 0.15s; width: 100%; }
+.form-input:focus { border-color: var(--line-2); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.form-hint { font-size: 12px; color: var(--fg-3); margin-top: 4px; }
+.role-toggle-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.role-toggle { font-family: 'JetBrains Mono'; font-size: 10px; padding: 5px 0; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: var(--fg-2); cursor: pointer; transition: all 0.12s; width: 56px; text-align: center; }
+.role-toggle:hover { border-color: var(--line-2); color: var(--fg-1); }
+.role-toggle.ng { background: color-mix(in oklch, var(--red) 14%, transparent); border-color: var(--red-d); color: var(--red); }
+.tag-toggle-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.tag-toggle { font-family: 'JetBrains Mono'; font-size: 11px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: transparent; color: var(--fg-2); cursor: pointer; transition: all 0.12s; }
+.tag-toggle:hover { border-color: var(--line-2); color: var(--fg-1); }
+.tag-toggle.on { background: color-mix(in oklch, var(--blue) 18%, transparent); border-color: var(--blue-d); color: var(--blue); }
+.rank-ref { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.rank-ref-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-radius: 7px; background: var(--bg-0); border: 1px solid var(--line); }
+.rank-ref-name { font-family: 'JetBrains Mono'; font-size: 11px; font-weight: 600; }
+.rank-ref-rates { font-family: 'JetBrains Mono'; font-size: 10px; color: var(--fg-2); }
+.divider { border: 0; border-top: 1px solid var(--line); margin: 0; }
+
+/* buttons */
+.btn { padding: 10px 20px; border-radius: 9px; font-family: 'Space Grotesk'; font-weight: 600; font-size: 13.5px; cursor: pointer; transition: all 0.15s; border: 0; }
+.btn-primary { background: var(--fg-0); color: var(--bg-0); }
+.btn-primary:hover { background: var(--gold); }
+.btn-ghost { background: transparent; border: 1px solid var(--line-2); color: var(--fg-1); }
+.btn-ghost:hover { background: var(--bg-2); color: var(--fg-0); }
+.btn-danger { background: transparent; border: 1px solid var(--red-d); color: var(--red); }
+.btn-danger:hover { background: color-mix(in oklch, var(--red) 15%, transparent); }
+.btn-sm { padding: 7px 14px; font-size: 12px; }
+
+/* history modal */
+.hist-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; background: var(--bg-0); border: 1px solid var(--line); border-radius: 11px; overflow: hidden; }
+.hist-stat { padding: 16px; border-right: 1px solid var(--line); text-align: center; }
+.hist-stat:last-child { border-right: 0; }
+.hist-stat .hs-n { font-family: 'Space Grotesk'; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+.hist-stat .hs-k { font-family: 'JetBrains Mono'; font-size: 10px; color: var(--fg-3); text-transform: uppercase; letter-spacing: 0.1em; margin-top: 4px; }
+
+.hist-table { width: 100%; border-collapse: collapse; }
+.hist-table th { font-family: 'JetBrains Mono'; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--fg-3); padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; background: var(--bg-0); }
+.hist-table td { padding: 10px 12px; border-bottom: 1px solid var(--line); font-size: 13px; }
+.hist-table tr:last-child td { border-bottom: 0; }
+.hist-table tr:hover td { background: var(--bg-2); }
+.win-badge { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 5px; font-family: 'JetBrains Mono'; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; }
+.win-badge.win  { background: color-mix(in oklch, var(--ok) 15%, transparent); color: var(--ok); }
+.win-badge.loss { background: color-mix(in oklch, var(--red) 13%, transparent); color: var(--red); }
+.team-badge { display: inline-flex; padding: 3px 10px; border-radius: 5px; font-family: 'JetBrains Mono'; font-size: 11px; letter-spacing: 0.06em; }
+.team-badge.blue { background: color-mix(in oklch, var(--blue) 14%, transparent); color: var(--blue); }
+.team-badge.red  { background: color-mix(in oklch, var(--red)  14%, transparent); color: var(--red); }
+
+/* rank ref toggle */
+.ref-toggle { font-family: 'JetBrains Mono'; font-size: 11px; color: var(--fg-2); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 4px 10px; cursor: pointer; transition: all 0.12s; }
+.ref-toggle:hover { border-color: var(--line-2); color: var(--fg-1); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel">
+const { useState, useMemo } = React;
+
+const MOCK_PLAYERS = [
+  { id:'1',  name:'Konny',  nickname:'コニー',   mainRole:'TOP',    mainRate:2210, subRate:1989, stats:{wins:24,losses:18}, tags:['常連'], unwantedRoles:[] },
+  { id:'2',  name:'Saito',  nickname:'サイトー',  mainRole:'JUNGLE', mainRate:1980, subRate:1782, stats:{wins:31,losses:22}, tags:['常連'], unwantedRoles:[] },
+  { id:'3',  name:'Yura',   nickname:'ゆら',     mainRole:'MID',    mainRate:1850, subRate:1665, stats:{wins:19,losses:17}, tags:['常連'], unwantedRoles:['TOP'] },
+  { id:'4',  name:'Mochi',  nickname:'もち',     mainRole:'ADC',    mainRate:1700, subRate:1530, stats:{wins:15,losses:20}, tags:['常連'], unwantedRoles:[] },
+  { id:'5',  name:'Pyon',   nickname:'ぴょん',   mainRole:'SUP',    mainRate:1470, subRate:1323, stats:{wins:22,losses:16}, tags:['常連'], unwantedRoles:['JUNGLE','MID'] },
+  { id:'6',  name:'Riku',   nickname:'リク',     mainRole:'TOP',    mainRate:2150, subRate:1935, stats:{wins:28,losses:21}, tags:['常連'], unwantedRoles:[] },
+  { id:'7',  name:'Hiro',   nickname:'ひろ',     mainRole:'JUNGLE', mainRate:2010, subRate:1809, stats:{wins:33,losses:24}, tags:['常連'], unwantedRoles:[] },
+  { id:'8',  name:'Kiri',   nickname:'きり',     mainRole:'MID',    mainRate:1820, subRate:1638, stats:{wins:16,losses:14}, tags:['常連'], unwantedRoles:[] },
+  { id:'9',  name:'Nao',    nickname:'なお',     mainRole:'ADC',    mainRate:1730, subRate:1557, stats:{wins:21,losses:19}, tags:['一般'], unwantedRoles:['TOP'] },
+  { id:'10', name:'Toi',    nickname:'とい',     mainRole:'SUP',    mainRate:1480, subRate:1332, stats:{wins:18,losses:22}, tags:['一般'], unwantedRoles:[] },
+  { id:'11', name:'Rin',    nickname:'りん',     mainRole:'MID',    mainRate:1620, subRate:1458, stats:{wins:11,losses:13}, tags:['一般'], unwantedRoles:['SUP'] },
+  { id:'12', name:'Kota',   nickname:'こうた',   mainRole:'TOP',    mainRate:1900, subRate:1710, stats:{wins:20,losses:17}, tags:['一般'], unwantedRoles:[] },
+  { id:'13', name:'Shu',    nickname:'しゅう',   mainRole:'JUNGLE', mainRate:1750, subRate:1575, stats:{wins:14,losses:16}, tags:['一般'], unwantedRoles:[] },
+  { id:'14', name:'Mika',   nickname:'みか',     mainRole:'SUP',    mainRate:1550, subRate:1395, stats:{wins:9, losses:10}, tags:['一般'], unwantedRoles:['JUNGLE'] },
+  { id:'15', name:'Yoshi',  nickname:'よし',     mainRole:'ADC',    mainRate:2100, subRate:1890, stats:{wins:26,losses:20}, tags:['一般'], unwantedRoles:[] },
+];
+const ROLES = ['TOP','JUNGLE','MID','ADC','SUP'];
+const AVAILABLE_TAGS = ['常連','一般'];
+const RANK_RATES = {
+  UNRANKED:{main:500,sub:450}, IRON:{main:600,sub:540}, BRONZE:{main:1300,sub:1170},
+  SILVER:{main:1500,sub:1350}, GOLD:{main:1700,sub:1530}, PLATINUM:{main:1900,sub:1710},
+  EMERALD:{main:2000,sub:1800}, DIAMOND:{main:2200,sub:1980}, MASTER:{main:2500,sub:2250},
+  GRANDMASTER:{main:2700,sub:2430}, CHALLENGER:{main:3000,sub:2700}
+};
+const RANK_COLORS = {
+  UNRANKED:'var(--fg-3)', IRON:'var(--fg-3)', BRONZE:'#cd7f32', SILVER:'#a8a9ad',
+  GOLD:'var(--gold)', PLATINUM:'oklch(0.72 0.15 180)', EMERALD:'oklch(0.74 0.18 155)',
+  DIAMOND:'var(--blue)', MASTER:'var(--r-adc)', GRANDMASTER:'var(--r-top)', CHALLENGER:'var(--gold)'
+};
+
+const MOCK_MATCHES = [
+  { id:'m1', date:{seconds:1745700120}, winner:'BLUE', players:[
+    {playerId:'1',team:'BLUE',role:'TOP'},{playerId:'2',team:'BLUE',role:'JUNGLE'},
+    {playerId:'3',team:'BLUE',role:'MID'},{playerId:'4',team:'BLUE',role:'ADC'},{playerId:'5',team:'BLUE',role:'SUP'},
+    {playerId:'6',team:'RED',role:'TOP'},{playerId:'7',team:'RED',role:'JUNGLE'},
+    {playerId:'8',team:'RED',role:'MID'},{playerId:'9',team:'RED',role:'ADC'},{playerId:'10',team:'RED',role:'SUP'},
+  ]},
+  { id:'m2', date:{seconds:1745613720}, winner:'RED', players:[
+    {playerId:'6',team:'BLUE',role:'TOP'},{playerId:'7',team:'BLUE',role:'JUNGLE'},
+    {playerId:'3',team:'BLUE',role:'MID'},{playerId:'4',team:'BLUE',role:'ADC'},{playerId:'10',team:'BLUE',role:'SUP'},
+    {playerId:'1',team:'RED',role:'TOP'},{playerId:'2',team:'RED',role:'JUNGLE'},
+    {playerId:'8',team:'RED',role:'MID'},{playerId:'9',team:'RED',role:'ADC'},{playerId:'5',team:'RED',role:'SUP'},
+  ]},
+  { id:'m3', date:{seconds:1745440320}, winner:'BLUE', players:[
+    {playerId:'1',team:'BLUE',role:'TOP'},{playerId:'7',team:'BLUE',role:'JUNGLE'},
+    {playerId:'8',team:'BLUE',role:'MID'},{playerId:'4',team:'BLUE',role:'ADC'},{playerId:'10',team:'BLUE',role:'SUP'},
+    {playerId:'2',team:'RED',role:'JUNGLE'},{playerId:'3',team:'RED',role:'MID'},
+    {playerId:'6',team:'RED',role:'TOP'},{playerId:'9',team:'RED',role:'ADC'},{playerId:'5',team:'RED',role:'SUP'},
+  ]},
+];
+
+function getRank(rate) {
+  const thresholds = [[3000,'CHALLENGER'],[2700,'GRANDMASTER'],[2500,'MASTER'],[2200,'DIAMOND'],[2000,'EMERALD'],[1900,'PLATINUM'],[1700,'GOLD'],[1500,'SILVER'],[1300,'BRONZE'],[600,'IRON']];
+  for (const [t,r] of thresholds) if (rate>=t) return r;
+  return 'UNRANKED';
+}
+function winRate(p) {
+  const total = p.stats.wins + p.stats.losses;
+  return total > 0 ? Math.round((p.stats.wins / total) * 100) : 0;
+}
+
+function RoleBadge({ role, sm }) {
+  return <span className={`role-badge ${role}${sm?' sm':''}`}>{role}</span>;
+}
+function RankChip({ rate }) {
+  const rank = getRank(rate);
+  return <span className="rank-chip" style={{color:RANK_COLORS[rank]}}>{rank}</span>;
+}
+
+// ── Edit Modal ─────────────────────────────────────────────────────────────
+function EditModal({ player, onSave, onClose }) {
+  const [name, setName] = useState(player.name);
+  const [nick, setNick] = useState(player.nickname||'');
+  const [mainRate, setMainRate] = useState(player.mainRate);
+  const [subRate, setSubRate] = useState(player.subRate);
+  const [tags, setTags] = useState([...(player.tags||[])]);
+  const [unwanted, setUnwanted] = useState([...(player.unwantedRoles||[])]);
+  const [showRef, setShowRef] = useState(false);
+
+  function toggleTag(t) { setTags(prev => prev.includes(t) ? prev.filter(x=>x!==t) : [...prev,t]); }
+  function toggleRole(r) { setUnwanted(prev => prev.includes(r) ? prev.filter(x=>x!==r) : [...prev,r]); }
+
+  return (
+    <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal">
+        <div className="modal-hd">
+          <h3>{player.nickname||player.name} の編集</h3>
+          <button className="modal-close" onClick={onClose}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+        </div>
+        <div className="modal-body">
+          <div className="form-row">
+            <div className="form-group">
+              <label className="form-label">サモナーネーム</label>
+              <input className="form-input" value={name} onChange={e=>setName(e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="form-label">ニックネーム</label>
+              <input className="form-input" value={nick} onChange={e=>setNick(e.target.value)} placeholder="Discord表示名（任意）" />
+            </div>
+          </div>
+
+          <hr className="divider" />
+
+          <div className="form-group">
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
+              <label className="form-label">レート</label>
+              <button className="ref-toggle" onClick={()=>setShowRef(v=>!v)}>{showRef?'参考を閉じる':'ランク参考'}</button>
+            </div>
+            {showRef && (
+              <div className="rank-ref" style={{marginBottom:12}}>
+                {Object.entries(RANK_RATES).map(([rank,rates])=>(
+                  <div key={rank} className="rank-ref-row">
+                    <span className="rank-ref-name" style={{color:RANK_COLORS[rank]}}>{rank}</span>
+                    <span className="rank-ref-rates">M:{rates.main} / S:{rates.sub}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">メインレート</label>
+                <input className="form-input" type="number" value={mainRate} onChange={e=>setMainRate(Number(e.target.value))} min={0} max={5000} />
+                <div className="form-hint">{getRank(mainRate)}</div>
+              </div>
+              <div className="form-group">
+                <label className="form-label">サブレート</label>
+                <input className="form-input" type="number" value={subRate} onChange={e=>setSubRate(Number(e.target.value))} min={0} max={5000} />
+                <div className="form-hint">{getRank(subRate)}</div>
+              </div>
+            </div>
+          </div>
+
+          <hr className="divider" />
+
+          <div className="form-group">
+            <label className="form-label">タグ</label>
+            <div className="tag-toggle-row">
+              {AVAILABLE_TAGS.map(t=>(
+                <button key={t} className={`tag-toggle${tags.includes(t)?' on':''}`} onClick={()=>toggleTag(t)}>{t}</button>
+              ))}
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">NGロール</label>
+            <div className="role-toggle-row">
+              {ROLES.map(r=>(
+                <button key={r} className={`role-toggle${unwanted.includes(r)?' ng':''}`} onClick={()=>toggleRole(r)}>{r}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="modal-ft">
+          <button className="btn btn-ghost" onClick={onClose}>キャンセル</button>
+          <button className="btn btn-primary" onClick={()=>onSave({name,nickname:nick||undefined,mainRate,subRate,tags,unwantedRoles:unwanted})}>保存</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── History Modal ──────────────────────────────────────────────────────────
+function HistoryModal({ player, onClose }) {
+  const matches = useMemo(()=>
+    MOCK_MATCHES.filter(m=>m.players.some(p=>p.playerId===player.id))
+      .map(m=>{
+        const pp = m.players.find(p=>p.playerId===player.id);
+        return {...m, playerTeam:pp.team, playerRole:pp.role, isWinner:pp.team===m.winner};
+      }), [player.id]);
+  const wins = matches.filter(m=>m.isWinner).length;
+  const wr = matches.length ? Math.round(wins/matches.length*100) : 0;
+
+  return (
+    <div className="modal-backdrop" onClick={e=>e.target===e.currentTarget&&onClose()}>
+      <div className="modal wide">
+        <div className="modal-hd">
+          <h3>{player.nickname||player.name} の試合履歴</h3>
+          <button className="modal-close" onClick={onClose}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+        </div>
+        <div className="modal-body">
+          <div className="hist-stats">
+            <div className="hist-stat"><div className="hs-n">{matches.length}</div><div className="hs-k">試合数</div></div>
+            <div className="hist-stat"><div className="hs-n" style={{color:'var(--ok)'}}>{wins}</div><div className="hs-k">勝利</div></div>
+            <div className="hist-stat"><div className="hs-n" style={{color:'var(--red)'}}>{matches.length-wins}</div><div className="hs-k">敗北</div></div>
+            <div className="hist-stat"><div className="hs-n" style={{color:wr>=50?'var(--ok)':'var(--red)'}}>{wr}%</div><div className="hs-k">勝率</div></div>
+          </div>
+          {matches.length===0 ? (
+            <div style={{textAlign:'center',color:'var(--fg-3)',fontFamily:"'JetBrains Mono'",fontSize:'12px',padding:'32px'}}>試合履歴がありません</div>
+          ) : (
+            <table className="hist-table">
+              <thead><tr>
+                <th>日時</th><th>チーム</th><th>ロール</th><th>結果</th>
+              </tr></thead>
+              <tbody>
+                {matches.map(m=>(
+                  <tr key={m.id}>
+                    <td style={{fontFamily:"'JetBrains Mono'",fontSize:'12px',color:'var(--fg-2)'}}>
+                      {new Date(m.date.seconds*1000).toLocaleDateString('ja-JP',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}
+                    </td>
+                    <td><span className={`team-badge ${m.playerTeam.toLowerCase()}`}>{m.playerTeam}</span></td>
+                    <td><RoleBadge role={m.playerRole} sm /></td>
+                    <td><span className={`win-badge ${m.isWinner?'win':'loss'}`}>{m.isWinner?'WIN':'LOSS'}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+        <div className="modal-ft">
+          <button className="btn btn-ghost" onClick={onClose}>閉じる</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Player Row ─────────────────────────────────────────────────────────────
+function PlayerRow({ player, onEdit, onHistory, onDelete }) {
+  const wr = winRate(player);
+  const total = player.stats.wins + player.stats.losses;
+  return (
+    <div className="tbl-row">
+      {/* Name */}
+      <div className="td">
+        <div className="player-name">{player.nickname||player.name}</div>
+        {player.nickname && <div className="player-sub">{player.name}</div>}
+      </div>
+      {/* Role */}
+      <div className="td"><RoleBadge role={player.mainRole} /></div>
+      {/* Main rate */}
+      <div className="td">
+        <div className="rate-main">{player.mainRate}</div>
+        <div style={{marginTop:3}}><RankChip rate={player.mainRate} /></div>
+      </div>
+      {/* Sub rate */}
+      <div className="td">
+        <div className="rate-sub" style={{fontSize:14,color:'var(--fg-1)'}}>{player.subRate}</div>
+        <div style={{marginTop:3}}><RankChip rate={player.subRate} /></div>
+      </div>
+      {/* Win rate */}
+      <div className="td">
+        <div className="wr-num" style={{color:wr>=50?'var(--ok)':'var(--red)'}}>{wr}%</div>
+        <div className="wr-bar"><div className="wr-fill" style={{width:`${wr}%`,background:wr>=50?'var(--ok)':'var(--red)'}}></div></div>
+        <div className="wr-record">{player.stats.wins}W {player.stats.losses}L</div>
+      </div>
+      {/* Tags */}
+      <div className="td">
+        <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+          {(player.tags||[]).map(t=><span key={t} className="tag-chip active" style={{fontSize:'9.5px',padding:'2px 8px'}}>{t}</span>)}
+          {(!player.tags||player.tags.length===0)&&<span style={{color:'var(--fg-3)',fontSize:'11px'}}>—</span>}
+        </div>
+      </div>
+      {/* NG roles */}
+      <div className="td">
+        <div className="ng-wrap">
+          {(player.unwantedRoles||[]).map(r=><span key={r} className="ng-chip">{r}</span>)}
+          {(!player.unwantedRoles||player.unwantedRoles.length===0)&&<span style={{color:'var(--fg-3)',fontSize:'11px'}}>—</span>}
+        </div>
+      </div>
+      {/* Actions */}
+      <div className="td">
+        <div className="act-row">
+          <button className="icon-btn hist" title="試合履歴" onClick={e=>{e.stopPropagation();onHistory(player);}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          </button>
+          <button className="icon-btn" title="編集" onClick={e=>{e.stopPropagation();onEdit(player);}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button className="icon-btn del" title="削除" onClick={e=>{e.stopPropagation();onDelete(player);}}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── App ────────────────────────────────────────────────────────────────────
+function App() {
+  const [players, setPlayers] = useState(MOCK_PLAYERS);
+  const [search, setSearch] = useState('');
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [sortBy, setSortBy] = useState('mainRate');
+  const [editPlayer, setEditPlayer] = useState(null);
+  const [histPlayer, setHistPlayer] = useState(null);
+
+  const tags = useMemo(()=>[...new Set(players.flatMap(p=>p.tags||[]))].sort(),[players]);
+
+  const filtered = useMemo(()=>{
+    let list = players.filter(p=>{
+      const q=search.toLowerCase();
+      const ms=(p.nickname||'').toLowerCase().includes(q)||p.name.toLowerCase().includes(q);
+      const mt=selectedTags.length===0||selectedTags.some(t=>p.tags?.includes(t));
+      return ms&&mt;
+    });
+    list = [...list].sort((a,b)=>{
+      if(sortBy==='mainRate') return b.mainRate-a.mainRate;
+      if(sortBy==='subRate')  return b.subRate-a.subRate;
+      if(sortBy==='wr')       return winRate(b)-winRate(a);
+      if(sortBy==='name')     return (a.nickname||a.name).localeCompare(b.nickname||b.name,'ja');
+      return 0;
+    });
+    return list;
+  },[players,search,selectedTags,sortBy]);
+
+  function saveEdit(p, data) {
+    setPlayers(prev=>prev.map(x=>x.id===p.id?{...x,...data}:x));
+    setEditPlayer(null);
+  }
+  function deletePlayer(p) {
+    if (window.confirm(`「${p.nickname||p.name}」を削除しますか？`)) {
+      setPlayers(prev=>prev.filter(x=>x.id!==p.id));
+    }
+  }
+
+  return (
+    <>
+      <header className="topbar">
+        <div className="topbar-inner">
+          <a className="brand" href="Top Page.html">
+            <span className="brand-mark"></span>
+            <span>Team Maker<span className="brand-sub">/ LoL</span></span>
+          </a>
+          <nav className="nav">
+            <a href="Top Page.html">ホーム</a>
+            <a href="#" className="active">プレイヤー</a>
+            <a href="Team Maker.html">チーム作成</a>
+            <a href="#">試合履歴</a>
+          </nav>
+        </div>
+      </header>
+
+      <div className="page">
+        <div className="page-hd">
+          <div style={{display:'flex',alignItems:'baseline',gap:8}}>
+            <h1>プレイヤー一覧</h1>
+            <span className="count-tag">{filtered.length} / {players.length} 人</span>
+          </div>
+          <button className="btn-add" onClick={()=>alert('新規登録ページへ')}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            新規登録
+          </button>
+        </div>
+
+        {/* Filter bar */}
+        <div className="filter-bar">
+          <div className="search-wrap">
+            <svg className="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+            <input type="text" placeholder="名前で検索…" value={search} onChange={e=>setSearch(e.target.value)} />
+          </div>
+          <select className="sort-select" value={sortBy} onChange={e=>setSortBy(e.target.value)}>
+            <option value="mainRate">メインレート順</option>
+            <option value="subRate">サブレート順</option>
+            <option value="wr">勝率順</option>
+            <option value="name">名前順</option>
+          </select>
+          <div className="tag-chips">
+            {tags.map(t=>(
+              <button key={t} className={`tag-chip${selectedTags.includes(t)?' active':''}`}
+                onClick={()=>setSelectedTags(prev=>prev.includes(t)?prev.filter(x=>x!==t):[...prev,t])}>
+                {t}
+              </button>
+            ))}
+            {selectedTags.length>0&&(
+              <button className="tag-chip" onClick={()=>setSelectedTags([])}>✕ 解除</button>
+            )}
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="tbl-wrap">
+          <div className="tbl-hd">
+            <div className="th">プレイヤー</div>
+            <div className="th">ロール</div>
+            <div className="th">メインレート</div>
+            <div className="th">サブレート</div>
+            <div className="th num">勝率</div>
+            <div className="th">タグ</div>
+            <div className="th">NGロール</div>
+            <div className="th"></div>
+          </div>
+          {filtered.map(p=>(
+            <PlayerRow key={p.id} player={p}
+              onEdit={setEditPlayer}
+              onHistory={setHistPlayer}
+              onDelete={deletePlayer} />
+          ))}
+          {filtered.length===0&&(
+            <div style={{textAlign:'center',color:'var(--fg-3)',fontFamily:"'JetBrains Mono'",fontSize:'12px',padding:'40px'}}>
+              該当するプレイヤーが見つかりません
+            </div>
+          )}
+        </div>
+      </div>
+
+      {editPlayer&&<EditModal player={editPlayer} onSave={data=>saveEdit(editPlayer,data)} onClose={()=>setEditPlayer(null)} />}
+      {histPlayer&&<HistoryModal player={histPlayer} onClose={()=>setHistPlayer(null)} />}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

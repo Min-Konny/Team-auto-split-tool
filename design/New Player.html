@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>プレイヤー登録 — LoL Team Maker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --bg-0: oklch(0.16 0.02 250);
+  --bg-1: oklch(0.20 0.022 250);
+  --bg-2: oklch(0.24 0.024 250);
+  --line: oklch(0.30 0.02 250);
+  --line-2: oklch(0.40 0.025 250);
+  --fg-0: oklch(0.96 0.01 250);
+  --fg-1: oklch(0.78 0.015 250);
+  --fg-2: oklch(0.58 0.018 250);
+  --fg-3: oklch(0.42 0.02 250);
+  --blue: oklch(0.72 0.16 240);
+  --blue-d: oklch(0.42 0.14 240);
+  --blue-bg: oklch(0.22 0.07 240);
+  --red: oklch(0.68 0.20 25);
+  --red-d: oklch(0.42 0.17 25);
+  --gold: oklch(0.82 0.13 85);
+  --ok: oklch(0.76 0.16 145);
+  --r-top: oklch(0.72 0.18 25);
+  --r-jng: oklch(0.76 0.16 145);
+  --r-mid: oklch(0.72 0.16 240);
+  --r-adc: oklch(0.72 0.18 305);
+  --r-sup: oklch(0.80 0.15 70);
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { background: var(--bg-0); color: var(--fg-0); font-family: 'Inter', system-ui, sans-serif; -webkit-font-smoothing: antialiased; min-height: 100vh; }
+
+/* topbar */
+.topbar { position: sticky; top: 0; z-index: 50; backdrop-filter: blur(18px); background: color-mix(in oklch, var(--bg-0) 85%, transparent); border-bottom: 1px solid var(--line); }
+.topbar-inner { max-width: 1440px; margin: 0 auto; padding: 12px 28px; display: flex; align-items: center; justify-content: space-between; }
+.brand { display: flex; align-items: center; gap: 10px; font-family: 'Space Grotesk'; font-weight: 600; font-size: 15px; text-decoration: none; color: inherit; }
+.brand-mark { width: 26px; height: 26px; position: relative; }
+.brand-mark::before, .brand-mark::after { content: ""; position: absolute; inset: 0; border-radius: 3px; }
+.brand-mark::before { background: linear-gradient(135deg, var(--blue), var(--blue-d)); clip-path: polygon(0 0,100% 0,100% 100%,50% 100%,0 50%); }
+.brand-mark::after  { background: linear-gradient(135deg, var(--red-d), var(--red)); clip-path: polygon(50% 100%,100% 100%,100% 50%); }
+.brand-sub { font-family: 'JetBrains Mono'; font-size: 10px; color: var(--fg-3); letter-spacing: 0.12em; text-transform: uppercase; margin-left: 4px; }
+.nav { display: flex; gap: 2px; }
+.nav a { padding: 7px 14px; border-radius: 999px; color: var(--fg-1); font-size: 13px; text-decoration: none; transition: background 0.15s, color 0.15s; }
+.nav a:hover { background: var(--bg-2); color: var(--fg-0); }
+.nav a.active { background: var(--bg-2); color: var(--fg-0); }
+
+/* page layout */
+.page { max-width: 1100px; margin: 0 auto; padding: 36px 28px 80px; display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
+
+/* form */
+.form-wrap { display: flex; flex-direction: column; gap: 12px; }
+.page-hd { margin-bottom: 8px; }
+.page-hd h1 { font-family: 'Space Grotesk'; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 4px; }
+.back-link { display: inline-flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono'; font-size: 11px; color: var(--fg-3); text-decoration: none; letter-spacing: 0.08em; transition: color 0.12s; }
+.back-link:hover { color: var(--fg-1); }
+
+/* form section */
+.fsec { background: var(--bg-1); border: 1px solid var(--line); border-radius: 13px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+.fsec-lbl { font-family: 'JetBrains Mono'; font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--fg-3); }
+.fsec-lbl .req { color: var(--red); margin-left: 4px; }
+.form-input {
+  width: 100%; padding: 11px 14px; background: var(--bg-0); border: 1px solid var(--line);
+  border-radius: 9px; color: var(--fg-0); font-family: inherit; font-size: 14px; outline: none;
+  transition: border-color 0.15s;
+}
+.form-input:focus { border-color: var(--line-2); }
+.form-input::placeholder { color: var(--fg-3); }
+.form-hint { font-size: 12px; color: var(--fg-3); }
+
+/* role selector */
+.role-grid { display: flex; gap: 8px; }
+.role-btn {
+  flex: 1; padding: 10px 4px; border-radius: 9px; border: 1px solid var(--line);
+  background: var(--bg-0); cursor: pointer; transition: all 0.15s; text-align: center;
+  font-family: 'JetBrains Mono'; font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+  color: var(--fg-2);
+}
+.role-btn:hover { border-color: var(--line-2); color: var(--fg-1); }
+.role-btn.sel-TOP    { background: color-mix(in oklch, var(--r-top) 14%, var(--bg-0)); border-color: var(--r-top); color: var(--r-top); }
+.role-btn.sel-JUNGLE { background: color-mix(in oklch, var(--r-jng) 14%, var(--bg-0)); border-color: var(--r-jng); color: var(--r-jng); }
+.role-btn.sel-MID    { background: color-mix(in oklch, var(--r-mid) 14%, var(--bg-0)); border-color: var(--r-mid); color: var(--r-mid); }
+.role-btn.sel-ADC    { background: color-mix(in oklch, var(--r-adc) 14%, var(--bg-0)); border-color: var(--r-adc); color: var(--r-adc); }
+.role-btn.sel-SUP    { background: color-mix(in oklch, var(--r-sup) 14%, var(--bg-0)); border-color: var(--r-sup); color: var(--r-sup); }
+.role-btn .role-icon { font-size: 16px; display: block; margin-bottom: 4px; }
+
+/* rank selector */
+.rank-list { display: flex; flex-direction: column; gap: 4px; }
+.rank-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 12px; border-radius: 8px; border: 1px solid transparent;
+  background: var(--bg-0); cursor: pointer; transition: all 0.12s;
+}
+.rank-row:hover { border-color: var(--line); }
+.rank-row.selected { border-color: var(--line-2); background: var(--bg-2); }
+.rank-name { font-family: 'JetBrains Mono'; font-size: 12px; font-weight: 600; }
+.rank-rates-hint { font-family: 'JetBrains Mono'; font-size: 10px; color: var(--fg-3); }
+
+/* chip toggle */
+.chip-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip {
+  font-family: 'JetBrains Mono'; font-size: 11px; letter-spacing: 0.06em;
+  padding: 7px 16px; border-radius: 999px; border: 1px solid var(--line);
+  background: transparent; color: var(--fg-2); cursor: pointer; transition: all 0.12s;
+}
+.chip:hover { border-color: var(--line-2); color: var(--fg-1); }
+.chip.on-blue { background: color-mix(in oklch, var(--blue) 18%, transparent); border-color: var(--blue-d); color: var(--blue); }
+.chip.on-red  { background: color-mix(in oklch, var(--red)  14%, transparent); border-color: var(--red-d);  color: var(--red); }
+
+/* submit */
+.submit-btn {
+  width: 100%; padding: 14px; border-radius: 11px; border: 0;
+  background: var(--fg-0); color: var(--bg-0);
+  font-family: 'Space Grotesk'; font-weight: 700; font-size: 15px;
+  cursor: pointer; transition: all 0.15s;
+}
+.submit-btn:hover:not(:disabled) { background: var(--gold); }
+.submit-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* validation error */
+.err-msg { font-size: 12px; color: var(--red); font-family: 'JetBrains Mono'; display: flex; align-items: center; gap: 5px; }
+
+/* ── Preview card (right column) ── */
+.preview-col { position: sticky; top: 90px; display: flex; flex-direction: column; gap: 14px; }
+.preview-lbl { font-family: 'JetBrains Mono'; font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--fg-3); padding: 0 2px; }
+.preview-card {
+  background: var(--bg-1); border: 1px solid var(--line); border-radius: 13px; padding: 20px;
+  transition: border-color 0.2s;
+}
+.preview-card.ready { border-color: var(--line-2); }
+.pv-name { font-family: 'Space Grotesk'; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+.pv-sub  { font-family: 'JetBrains Mono'; font-size: 11px; color: var(--fg-3); margin-top: 2px; }
+.pv-role-badge { display: inline-block; font-family: 'JetBrains Mono'; font-size: 10px; font-weight: 600; padding: 3px 0; border-radius: 5px; letter-spacing: 0.05em; width: 60px; text-align: center; background: var(--bg-2); margin-top: 12px; }
+.pv-role-badge.TOP    { color: var(--r-top); border: 1px solid color-mix(in oklch, var(--r-top) 35%, transparent); }
+.pv-role-badge.JUNGLE { color: var(--r-jng); border: 1px solid color-mix(in oklch, var(--r-jng) 35%, transparent); }
+.pv-role-badge.MID    { color: var(--r-mid); border: 1px solid color-mix(in oklch, var(--r-mid) 35%, transparent); }
+.pv-role-badge.ADC    { color: var(--r-adc); border: 1px solid color-mix(in oklch, var(--r-adc) 35%, transparent); }
+.pv-role-badge.SUP    { color: var(--r-sup); border: 1px solid color-mix(in oklch, var(--r-sup) 35%, transparent); }
+.pv-rates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+.pv-rate-block { background: var(--bg-0); border-radius: 9px; padding: 12px; }
+.pv-rate-k { font-family: 'JetBrains Mono'; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--fg-3); }
+.pv-rate-v { font-family: 'Space Grotesk'; font-size: 28px; font-weight: 600; letter-spacing: -0.03em; margin-top: 4px; }
+.pv-rank   { font-family: 'JetBrains Mono'; font-size: 11px; margin-top: 2px; }
+.pv-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 14px; }
+.pv-tag { font-family: 'JetBrains Mono'; font-size: 10px; padding: 3px 10px; border-radius: 999px; background: color-mix(in oklch, var(--blue) 16%, transparent); border: 1px solid var(--blue-d); color: var(--blue); }
+.pv-ng { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 8px; }
+.pv-ng-chip { font-family: 'JetBrains Mono'; font-size: 10px; padding: 2px 8px; border-radius: 4px; background: color-mix(in oklch, var(--red) 13%, transparent); border: 1px solid var(--red-d); color: var(--red); }
+.pv-empty { color: var(--fg-3); font-family: 'JetBrains Mono'; font-size: 12px; text-align: center; padding: 24px 0; }
+
+/* success toast */
+.toast { position: fixed; bottom: 24px; right: 24px; z-index: 200; background: var(--bg-2); border: 1px solid var(--ok); border-radius: 11px; padding: 14px 18px; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ok); animation: slideUp 0.2s ease; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+.toast.err { border-color: var(--red); color: var(--red); }
+@keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const ROLES = ['TOP','JUNGLE','MID','ADC','SUP'];
+const AVAILABLE_TAGS = ['常連','一般'];
+const RANK_RATES = {
+  UNRANKED:{main:500,sub:450}, IRON:{main:600,sub:540}, BRONZE:{main:1300,sub:1170},
+  SILVER:{main:1500,sub:1350}, GOLD:{main:1700,sub:1530}, PLATINUM:{main:1900,sub:1710},
+  EMERALD:{main:2000,sub:1800}, DIAMOND:{main:2200,sub:1980}, MASTER:{main:2500,sub:2250},
+  GRANDMASTER:{main:2700,sub:2430}, CHALLENGER:{main:3000,sub:2700}
+};
+const RANK_COLORS = {
+  UNRANKED:'var(--fg-3)', IRON:'var(--fg-3)', BRONZE:'#cd7f32', SILVER:'#a8a9ad',
+  GOLD:'var(--gold)', PLATINUM:'oklch(0.72 0.15 180)', EMERALD:'oklch(0.74 0.18 155)',
+  DIAMOND:'var(--blue)', MASTER:'var(--r-adc)', GRANDMASTER:'var(--r-top)', CHALLENGER:'var(--gold)'
+};
+const ROLE_ICONS = { TOP:'🗡', JUNGLE:'🌲', MID:'⚡', ADC:'🏹', SUP:'🛡' };
+
+function getRank(rate) {
+  const t=[[3000,'CHALLENGER'],[2700,'GRANDMASTER'],[2500,'MASTER'],[2200,'DIAMOND'],[2000,'EMERALD'],[1900,'PLATINUM'],[1700,'GOLD'],[1500,'SILVER'],[1300,'BRONZE'],[600,'IRON']];
+  for(const [v,r] of t) if(rate>=v) return r;
+  return 'UNRANKED';
+}
+
+function Toast({ msg, type, onDone }) {
+  useEffect(()=>{ const t=setTimeout(onDone,2800); return ()=>clearTimeout(t); },[]);
+  return (
+    <div className={`toast ${type==='err'?'err':''}`}>
+      {type==='err'
+        ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+        : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5"/></svg>
+      }
+      {msg}
+    </div>
+  );
+}
+
+function PreviewCard({ name, nick, role, rank, tags, unwanted }) {
+  const rates = RANK_RATES[rank] || RANK_RATES['UNRANKED'];
+  const isEmpty = !name && !role;
+  return (
+    <div className={`preview-card${name?'  ready':''}`}>
+      {isEmpty ? (
+        <div className="pv-empty">左のフォームを入力すると<br/>プレビューが表示されます</div>
+      ) : (
+        <>
+          <div className="pv-name">{nick||name||'—'}</div>
+          {nick&&name&&<div className="pv-sub">{name}</div>}
+          {role&&<div className={`pv-role-badge ${role}`}>{role}</div>}
+          <div className="pv-rates">
+            <div className="pv-rate-block">
+              <div className="pv-rate-k">メイン</div>
+              <div className="pv-rate-v">{rates.main}</div>
+              <div className="pv-rank" style={{color:RANK_COLORS[getRank(rates.main)]}}>{getRank(rates.main)}</div>
+            </div>
+            <div className="pv-rate-block">
+              <div className="pv-rate-k">サブ</div>
+              <div className="pv-rate-v">{rates.sub}</div>
+              <div className="pv-rank" style={{color:RANK_COLORS[getRank(rates.sub)]}}>{getRank(rates.sub)}</div>
+            </div>
+          </div>
+          {tags.length>0&&(
+            <div className="pv-tags">
+              {tags.map(t=><span key={t} className="pv-tag">{t}</span>)}
+            </div>
+          )}
+          {unwanted.length>0&&(
+            <div className="pv-ng">
+              {unwanted.map(r=><span key={r} className="pv-ng-chip">NG:{r}</span>)}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [name, setName] = useState('');
+  const [nick, setNick] = useState('');
+  const [role, setRole] = useState('');
+  const [rank, setRank] = useState('GOLD');
+  const [tags, setTags] = useState([]);
+  const [unwanted, setUnwanted] = useState([]);
+  const [toast, setToast] = useState(null);
+  const [errors, setErrors] = useState({});
+
+  function toggleTag(t) { setTags(p=>p.includes(t)?p.filter(x=>x!==t):[...p,t]); }
+  function toggleUnwanted(r) { setUnwanted(p=>p.includes(r)?p.filter(x=>x!==r):[...p,r]); }
+
+  const canSubmit = name.trim() && role && tags.length > 0;
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    const errs = {};
+    if (!name.trim()) errs.name = 'サモナーネームを入力してください';
+    if (!role) errs.role = 'メインロールを選択してください';
+    if (tags.length === 0) errs.tags = 'タグを1つ以上選択してください';
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) {
+      setToast({ msg: '入力内容を確認してください', type: 'err' });
+      return;
+    }
+    const rates = RANK_RATES[rank];
+    setToast({ msg: `${nick||name} を登録しました`, type: 'ok' });
+    // reset
+    setName(''); setNick(''); setRole(''); setRank('GOLD'); setTags([]); setUnwanted([]);
+  }
+
+  return (
+    <>
+      <header className="topbar">
+        <div className="topbar-inner">
+          <a className="brand" href="Top Page.html">
+            <span className="brand-mark"></span>
+            <span>Team Maker<span className="brand-sub">/ LoL</span></span>
+          </a>
+          <nav className="nav">
+            <a href="Top Page.html">ホーム</a>
+            <a href="Players.html" className="active">プレイヤー</a>
+            <a href="Team Maker.html">チーム作成</a>
+            <a href="Matches.html">試合履歴</a>
+          </nav>
+        </div>
+      </header>
+
+      <div className="page">
+        {/* Left: form */}
+        <div className="form-wrap">
+          <div className="page-hd">
+            <a className="back-link" href="Players.html">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+              プレイヤー一覧へ
+            </a>
+            <h1 style={{marginTop:10}}>プレイヤー登録</h1>
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            {/* サモナーネーム */}
+            <div className="fsec" style={{marginBottom:10}}>
+              <label className="fsec-lbl">サモナーネーム<span className="req">*</span></label>
+              <input className="form-input" placeholder="FAKER#JP1" value={name} onChange={e=>{setName(e.target.value);setErrors(p=>({...p,name:undefined}));}} />
+              {errors.name && <div className="err-msg"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>{errors.name}</div>}
+            </div>
+
+            {/* ニックネーム */}
+            <div className="fsec" style={{marginBottom:10}}>
+              <label className="fsec-lbl">ニックネーム <span style={{color:'var(--fg-3)',fontWeight:400}}>Discord表示名・任意</span></label>
+              <input className="form-input" placeholder="こにー" value={nick} onChange={e=>setNick(e.target.value)} />
+              <div className="form-hint">設定するとリストや選択画面で優先表示されます</div>
+            </div>
+
+            {/* メインロール */}
+            <div className="fsec" style={{marginBottom:10}}>
+              <label className="fsec-lbl">メインロール<span className="req">*</span></label>
+              <div className="role-grid">
+                {ROLES.map(r=>(
+                  <button key={r} type="button"
+                    className={`role-btn${role===r?` sel-${r}`:''}`}
+                    onClick={()=>{setRole(r);setErrors(p=>({...p,role:undefined}));}}>
+                    <span className="role-icon">{ROLE_ICONS[r]}</span>
+                    {r}
+                  </button>
+                ))}
+              </div>
+              {errors.role && <div className="err-msg"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>{errors.role}</div>}
+            </div>
+
+            {/* ランク */}
+            <div className="fsec" style={{marginBottom:10}}>
+              <label className="fsec-lbl">ランク<span className="req">*</span></label>
+              <div className="rank-list">
+                {Object.entries(RANK_RATES).map(([r, rates])=>(
+                  <div key={r} className={`rank-row${rank===r?' selected':''}`} onClick={()=>setRank(r)}>
+                    <span className="rank-name" style={{color:RANK_COLORS[r]}}>{r}</span>
+                    <span className="rank-rates-hint">M:{rates.main} / S:{rates.sub}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* タグ */}
+            <div className="fsec" style={{marginBottom:10}}>
+              <label className="fsec-lbl">タグ<span className="req">*</span> <span style={{color:'var(--fg-3)',fontWeight:400}}>1つ以上選択</span></label>
+              <div className="chip-row">
+                {AVAILABLE_TAGS.map(t=>(
+                  <button key={t} type="button" className={`chip${tags.includes(t)?' on-blue':''}`} onClick={()=>{toggleTag(t);setErrors(p=>({...p,tags:undefined}));}}>{t}</button>
+                ))}
+              </div>
+              {errors.tags && <div className="err-msg"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>{errors.tags}</div>}
+            </div>
+
+            {/* NG ロール */}
+            <div className="fsec" style={{marginBottom:16}}>
+              <label className="fsec-lbl">NGロール <span style={{color:'var(--fg-3)',fontWeight:400}}>任意</span></label>
+              <div className="chip-row">
+                {ROLES.map(r=>(
+                  <button key={r} type="button" className={`chip${unwanted.includes(r)?' on-red':''}`} onClick={()=>toggleUnwanted(r)}>{r}</button>
+                ))}
+              </div>
+              <div className="form-hint">絶対にやりたくないロール。チーム自動振り分け時に除外されます。</div>
+            </div>
+
+            <button className="submit-btn" type="submit" disabled={!canSubmit}>
+              登録する
+            </button>
+          </form>
+        </div>
+
+        {/* Right: preview */}
+        <div className="preview-col">
+          <div className="preview-lbl">プレビュー</div>
+          <PreviewCard name={name} nick={nick} role={role} rank={rank} tags={tags} unwanted={unwanted} />
+
+          {/* Checklist */}
+          <div style={{background:'var(--bg-1)',border:'1px solid var(--line)',borderRadius:13,padding:'16px 18px'}}>
+            <div style={{fontFamily:"'JetBrains Mono'",fontSize:10,textTransform:'uppercase',letterSpacing:'0.14em',color:'var(--fg-3)',marginBottom:10}}>確認リスト</div>
+            {[
+              {key:'name', label:'サモナーネーム', ok: !!name.trim()},
+              {key:'role', label:'メインロール', ok: !!role},
+              {key:'rank', label:'ランク', ok: !!rank},
+              {key:'tags', label:'タグ（1つ以上）', ok: tags.length>0},
+            ].map(item=>(
+              <div key={item.key} style={{display:'flex',alignItems:'center',gap:10,padding:'6px 0',borderBottom:'1px solid var(--line)'}}>
+                <div style={{width:18,height:18,borderRadius:'50%',display:'grid',placeItems:'center',background:item.ok?'color-mix(in oklch, var(--ok) 18%, transparent)':'var(--bg-2)',border:`1px solid ${item.ok?'var(--ok)':'var(--line-2)'}`}}>
+                  {item.ok&&<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>}
+                </div>
+                <span style={{fontSize:13,color:item.ok?'var(--fg-1)':'var(--fg-3)'}}>{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {toast && <Toast msg={toast.msg} type={toast.type} onDone={()=>setToast(null)} />}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

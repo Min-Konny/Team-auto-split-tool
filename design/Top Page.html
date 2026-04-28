@@ -1,0 +1,770 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>LoL Team Maker — Top</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* tone */
+    --bg-0: oklch(0.16 0.02 250);
+    --bg-1: oklch(0.20 0.022 250);
+    --bg-2: oklch(0.24 0.024 250);
+    --line:   oklch(0.32 0.02 250);
+    --line-2: oklch(0.42 0.025 250);
+    --fg-0: oklch(0.96 0.01 250);
+    --fg-1: oklch(0.78 0.015 250);
+    --fg-2: oklch(0.58 0.018 250);
+    --fg-3: oklch(0.42 0.02 250);
+
+    /* sides */
+    --blue:  oklch(0.72 0.16 240);
+    --blue-d: oklch(0.42 0.14 240);
+    --blue-bg: oklch(0.28 0.07 240);
+    --red:   oklch(0.68 0.20 25);
+    --red-d:  oklch(0.42 0.17 25);
+    --red-bg: oklch(0.28 0.10 25);
+
+    /* roles */
+    --r-top: oklch(0.7 0.18 25);
+    --r-jng: oklch(0.75 0.16 145);
+    --r-mid: oklch(0.72 0.16 240);
+    --r-adc: oklch(0.72 0.18 305);
+    --r-sup: oklch(0.78 0.15 70);
+
+    --gold: oklch(0.82 0.13 85);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg-0);
+    color: var(--fg-0);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: "ss01", "cv11";
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .display { font-family: 'Space Grotesk', system-ui, sans-serif; letter-spacing: -0.02em; }
+  a { color: inherit; text-decoration: none; }
+  button { font-family: inherit; cursor: pointer; }
+
+  /* ── shared chrome ── */
+  .topbar {
+    position: sticky; top: 0; z-index: 30;
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    background: color-mix(in oklch, var(--bg-0) 82%, transparent);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar-inner {
+    max-width: 1440px; margin: 0 auto;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 32px;
+  }
+  .brand {
+    display: flex; align-items: center; gap: 12px;
+    font-family: 'Space Grotesk'; font-weight: 600; letter-spacing: -0.01em;
+  }
+  .brand-mark {
+    width: 28px; height: 28px; position: relative;
+  }
+  .brand-mark::before, .brand-mark::after {
+    content: ""; position: absolute; inset: 0;
+    border-radius: 4px;
+  }
+  .brand-mark::before {
+    background: linear-gradient(135deg, var(--blue) 0%, var(--blue-d) 100%);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 100%, 0 50%);
+  }
+  .brand-mark::after {
+    background: linear-gradient(135deg, var(--red-d) 0%, var(--red) 100%);
+    clip-path: polygon(50% 100%, 100% 100%, 100% 50%);
+  }
+  .brand-text { font-size: 15px; }
+  .brand-sub  { font-size: 11px; color: var(--fg-3); margin-left: 4px; font-family:'JetBrains Mono'; text-transform: uppercase; letter-spacing: 0.1em; }
+
+  .nav { display: flex; gap: 4px; align-items: center; }
+  .nav a {
+    padding: 8px 14px; border-radius: 999px;
+    color: var(--fg-1); font-size: 13.5px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .nav a:hover { background: var(--bg-2); color: var(--fg-0); }
+  .nav a.cta {
+    background: var(--fg-0); color: var(--bg-0); font-weight: 600;
+    margin-left: 8px;
+  }
+  .nav a.cta:hover { background: var(--fg-1); }
+
+  .container { max-width: 1440px; margin: 0 auto; padding: 0 32px; }
+
+  /* ════════════════════════════════════════════════════════════════
+     VARIANT 1 — SPLIT HERO
+     ════════════════════════════════════════════════════════════════ */
+  .v1-hero {
+    position: relative; overflow: hidden;
+    border-bottom: 1px solid var(--line);
+  }
+  .v1-split {
+    display: grid; grid-template-columns: 1fr auto 1fr;
+    min-height: 560px; align-items: stretch;
+  }
+  .v1-side {
+    padding: 80px 56px 72px; position: relative;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .v1-side.blue {
+    background: linear-gradient(180deg,
+      color-mix(in oklch, var(--blue-bg) 55%, transparent) 0%,
+      color-mix(in oklch, var(--blue-bg) 10%, transparent) 100%);
+    text-align: right;
+  }
+  .v1-side.red {
+    background: linear-gradient(180deg,
+      color-mix(in oklch, var(--red-bg) 55%, transparent) 0%,
+      color-mix(in oklch, var(--red-bg) 10%, transparent) 100%);
+  }
+  .v1-side .side-tag {
+    font-family: 'JetBrains Mono'; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.18em;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .v1-side.blue .side-tag { justify-content: flex-end; color: var(--blue); }
+  .v1-side.red  .side-tag { color: var(--red); }
+  .side-tag .dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    box-shadow: 0 0 0 4px color-mix(in oklch, currentColor 18%, transparent);
+  }
+  .v1-side.blue .side-tag .dot { background: var(--blue); }
+  .v1-side.red  .side-tag .dot { background: var(--red); }
+  .v1-side h2 {
+    font-family: 'Space Grotesk'; font-weight: 700;
+    font-size: clamp(48px, 7.4vw, 104px); line-height: 0.92;
+    letter-spacing: -0.04em; margin: 28px 0 0;
+  }
+  .v1-side.blue h2 { color: var(--blue); }
+  .v1-side.red  h2 { color: var(--red);  }
+  .v1-side .hex {
+    margin-top: 14px; font-family: 'JetBrains Mono'; font-size: 12px; color: var(--fg-3);
+  }
+  .v1-side .ros {
+    margin-top: 28px; display: grid; gap: 6px; font-family: 'JetBrains Mono'; font-size: 12px;
+    color: var(--fg-2);
+  }
+  .v1-side.blue .ros { justify-items: end; }
+  .ros-row { display: flex; gap: 14px; align-items: center; }
+  .ros-row .role {
+    width: 36px; padding: 2px 0; text-align: center;
+    border-radius: 3px; color: var(--fg-1);
+    background: var(--bg-2); font-size: 10px; letter-spacing: 0.06em;
+  }
+  .ros-row .name { color: var(--fg-1); }
+  .ros-row .rate { color: var(--fg-3); }
+
+  .v1-vs {
+    width: 1px; background: linear-gradient(180deg, transparent 0%, var(--line-2) 30%, var(--line-2) 70%, transparent 100%);
+    position: relative;
+  }
+  .v1-vs::after {
+    content: "VS"; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+    font-family: 'Space Grotesk'; font-weight: 700; font-size: 20px;
+    background: var(--bg-0); padding: 16px 6px;
+    color: var(--fg-2); letter-spacing: 0.05em;
+  }
+
+  .v1-meta {
+    display: grid; grid-template-columns: 1fr 1fr 1fr 1fr;
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    background: var(--bg-1);
+  }
+  .v1-meta .cell {
+    padding: 22px 32px; border-right: 1px solid var(--line);
+  }
+  .v1-meta .cell:last-child { border-right: 0; }
+  .v1-meta .k { font-family:'JetBrains Mono'; font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--fg-3); }
+  .v1-meta .v { font-family:'Space Grotesk'; font-size: 28px; font-weight: 600; margin-top: 6px; letter-spacing:-0.02em; }
+  .v1-meta .v .unit { font-size: 13px; color: var(--fg-3); margin-left: 4px; font-family:'JetBrains Mono'; }
+
+  .v1-actions {
+    padding: 80px 32px 100px;
+    display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 16px;
+  }
+  .action-card {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 26px;
+    background: var(--bg-1);
+    display: flex; flex-direction: column;
+    transition: border-color 0.2s, transform 0.2s, background 0.2s;
+    min-height: 220px;
+    position: relative; overflow: hidden;
+  }
+  .action-card:hover {
+    border-color: var(--line-2);
+    transform: translateY(-2px);
+    background: var(--bg-2);
+  }
+  .action-card.primary {
+    background: linear-gradient(135deg,
+      color-mix(in oklch, var(--blue-bg) 70%, var(--bg-1)) 0%,
+      color-mix(in oklch, var(--red-bg) 50%, var(--bg-1)) 100%);
+    border-color: var(--line-2);
+  }
+  .action-card .num {
+    font-family: 'JetBrains Mono'; font-size: 11px; color: var(--fg-3);
+    letter-spacing: 0.1em;
+  }
+  .action-card h3 {
+    font-family: 'Space Grotesk'; font-size: 26px; font-weight: 600;
+    letter-spacing: -0.02em; margin: 18px 0 10px;
+  }
+  .action-card.primary h3 { font-size: 36px; }
+  .action-card p {
+    color: var(--fg-2); font-size: 13.5px; line-height: 1.55;
+    margin: 0 0 20px; flex: 1;
+  }
+  .action-card .cta-row {
+    display: flex; align-items: center; justify-content: space-between;
+    color: var(--fg-1); font-size: 13px;
+    border-top: 1px solid var(--line); padding-top: 16px;
+  }
+  .action-card .cta-row .arr {
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--bg-2); display: grid; place-items: center;
+    transition: background 0.15s, transform 0.15s;
+  }
+  .action-card:hover .cta-row .arr { background: var(--fg-0); color: var(--bg-0); transform: translateX(2px); }
+  .action-card.primary .cta-row .arr { background: var(--fg-0); color: var(--bg-0); }
+  .action-card .cta-row .arr svg { width: 14px; height: 14px; }
+
+  .action-card .glyph {
+    position: absolute; right: -10px; top: -10px; width: 70px; height: 70px;
+    border-radius: 50%; opacity: 0.4;
+  }
+  .action-card.players .glyph { background: radial-gradient(circle, var(--r-mid) 0%, transparent 70%); }
+  .action-card.new .glyph { background: radial-gradient(circle, var(--r-jng) 0%, transparent 70%); }
+  .action-card.match .glyph { background: radial-gradient(circle, var(--r-top) 0%, transparent 70%); }
+
+  /* ════════════════════════════════════════════════════════════════
+     VARIANT 2 — COMMAND CENTER (dashboard density)
+     ════════════════════════════════════════════════════════════════ */
+  .v2-wrap {
+    padding: 40px 0 80px;
+  }
+  .v2-grid {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 24px;
+  }
+  .v2-hero-card {
+    background: var(--bg-1); border: 1px solid var(--line);
+    border-radius: 18px; padding: 36px 32px;
+    display: flex; flex-direction: column; min-height: 540px;
+    position: relative; overflow: hidden;
+  }
+  .v2-hero-card::before {
+    content: ""; position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 0% 0%, color-mix(in oklch, var(--blue-bg) 70%, transparent) 0%, transparent 45%),
+      radial-gradient(circle at 100% 100%, color-mix(in oklch, var(--red-bg) 70%, transparent) 0%, transparent 45%);
+    opacity: 0.85; pointer-events: none;
+  }
+  .v2-hero-card > * { position: relative; }
+  .v2-tag {
+    font-family: 'JetBrains Mono'; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.18em; color: var(--fg-2);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .v2-tag .dot { width: 6px; height: 6px; border-radius:50%; background: oklch(0.72 0.18 145); box-shadow: 0 0 0 3px color-mix(in oklch, oklch(0.72 0.18 145) 18%, transparent); }
+  .v2-hero-card h1 {
+    font-family: 'Space Grotesk'; font-weight: 600;
+    font-size: 56px; line-height: 0.95; letter-spacing: -0.035em;
+    margin: 28px 0 16px;
+  }
+  .v2-hero-card .lede {
+    color: var(--fg-1); font-size: 15px; line-height: 1.55; margin: 0 0 36px;
+  }
+  .v2-cta {
+    display: flex; gap: 10px; margin-top: auto;
+  }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 14px 22px; border-radius: 12px;
+    font-size: 14px; font-weight: 600; letter-spacing: -0.005em;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+    text-decoration: none;
+  }
+  .btn-primary { background: var(--fg-0); color: var(--bg-0); }
+  .btn-primary:hover { background: var(--gold); }
+  .btn-ghost { background: transparent; color: var(--fg-1); border-color: var(--line-2); }
+  .btn-ghost:hover { background: var(--bg-2); color: var(--fg-0); }
+  .btn svg { width: 16px; height: 16px; }
+
+  .v2-right {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    gap: 24px;
+  }
+  .v2-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 0;
+    background: var(--bg-1); border: 1px solid var(--line); border-radius: 18px;
+    overflow: hidden;
+  }
+  .v2-stats .cell {
+    padding: 24px 22px; border-right: 1px solid var(--line);
+    position: relative;
+  }
+  .v2-stats .cell:last-child { border-right: 0; }
+  .v2-stats .k { font-family:'JetBrains Mono'; font-size: 10px; text-transform: uppercase; letter-spacing:0.16em; color: var(--fg-3); }
+  .v2-stats .v { font-family:'Space Grotesk'; font-size: 32px; font-weight: 600; margin-top: 8px; letter-spacing: -0.02em; }
+  .v2-stats .delta { font-family:'JetBrains Mono'; font-size: 11px; color: oklch(0.72 0.18 145); margin-top: 4px; }
+  .v2-stats .delta.dim { color: var(--fg-3); }
+
+  .v2-modules {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+  }
+  .module {
+    background: var(--bg-1); border: 1px solid var(--line);
+    border-radius: 16px; padding: 22px;
+    display: flex; flex-direction: column;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .module:hover { border-color: var(--line-2); transform: translateY(-2px); }
+  .module-hd { display: flex; align-items: center; justify-content: space-between; }
+  .module-hd .icon {
+    width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center;
+    background: var(--bg-2); color: var(--fg-1);
+  }
+  .module-hd .icon svg { width: 16px; height: 16px; }
+  .module-hd .badge {
+    font-family:'JetBrains Mono'; font-size: 10px; padding: 3px 8px; border-radius: 999px;
+    background: var(--bg-2); color: var(--fg-2); letter-spacing: 0.08em;
+  }
+  .module h4 {
+    font-family:'Space Grotesk'; font-size: 19px; font-weight: 600;
+    letter-spacing: -0.015em; margin: 18px 0 6px;
+  }
+  .module p { color: var(--fg-2); font-size: 13px; line-height: 1.5; margin: 0 0 18px; flex: 1; }
+  .module .arr-link {
+    display: inline-flex; align-items: center; gap: 8px;
+    color: var(--fg-1); font-size: 13px; font-weight: 500;
+  }
+  .module .arr-link svg { width: 13px; transition: transform 0.15s; }
+  .module:hover .arr-link svg { transform: translateX(3px); }
+
+  .v2-recent {
+    margin-top: 24px;
+    background: var(--bg-1); border: 1px solid var(--line); border-radius: 16px;
+    overflow: hidden;
+  }
+  .v2-recent-hd {
+    padding: 16px 22px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .v2-recent-hd h5 { margin: 0; font-family:'Space Grotesk'; font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+  .v2-recent-hd a { font-family:'JetBrains Mono'; font-size: 11px; color: var(--fg-2); letter-spacing: 0.1em; text-transform: uppercase; }
+  .match-row {
+    display: grid;
+    grid-template-columns: 80px 1fr 60px 1fr 100px;
+    align-items: center; gap: 14px;
+    padding: 14px 22px; border-bottom: 1px solid var(--line);
+    font-size: 13px;
+  }
+  .match-row:last-child { border-bottom: 0; }
+  .match-row .date { font-family:'JetBrains Mono'; font-size: 11.5px; color: var(--fg-3); }
+  .match-row .blue-team, .match-row .red-team { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--fg-1); }
+  .match-row .blue-team .swatch { width: 4px; height: 18px; background: var(--blue); border-radius: 2px; }
+  .match-row .red-team { justify-content: flex-end; }
+  .match-row .red-team .swatch { width: 4px; height: 18px; background: var(--red); border-radius: 2px; }
+  .match-row .vs-mini { text-align: center; font-family:'JetBrains Mono'; font-size: 10px; color: var(--fg-3); letter-spacing: 0.1em; }
+  .match-row .winner { text-align: right; font-family:'JetBrains Mono'; font-size: 11px; letter-spacing: 0.08em; }
+  .match-row .winner.blue { color: var(--blue); }
+  .match-row .winner.red  { color: var(--red);  }
+
+  /* ════════════════════════════════════════════════════════════════
+     VARIANT 3 — EDITORIAL (calm, type-first)
+     ════════════════════════════════════════════════════════════════ */
+  .v3-wrap { padding: 100px 0 120px; max-width: 1100px; margin: 0 auto; }
+  .v3-eyebrow {
+    font-family:'JetBrains Mono'; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.2em; color: var(--fg-2);
+    display: flex; gap: 14px; align-items: center;
+  }
+  .v3-eyebrow .ln { width: 36px; height: 1px; background: var(--line-2); }
+  .v3-title {
+    font-family:'Space Grotesk'; font-weight: 500;
+    font-size: clamp(48px, 7vw, 88px);
+    line-height: 1.0; letter-spacing: -0.04em;
+    margin: 36px 0 32px; max-width: 900px;
+  }
+  .v3-title em {
+    font-style: normal;
+    background: linear-gradient(90deg, var(--blue) 0%, var(--gold) 50%, var(--red) 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .v3-lede {
+    font-size: 18px; line-height: 1.55; color: var(--fg-1);
+    max-width: 600px; margin: 0 0 56px;
+  }
+  .v3-list {
+    border-top: 1px solid var(--line);
+  }
+  .v3-row {
+    display: grid;
+    grid-template-columns: 60px 1fr 320px 60px;
+    align-items: center; gap: 32px;
+    padding: 32px 8px; border-bottom: 1px solid var(--line);
+    transition: background 0.2s;
+    position: relative;
+  }
+  .v3-row:hover { background: color-mix(in oklch, var(--bg-1) 70%, transparent); }
+  .v3-row .idx { font-family:'JetBrains Mono'; font-size: 11px; color: var(--fg-3); letter-spacing: 0.1em; }
+  .v3-row .lbl { font-family:'Space Grotesk'; font-size: 32px; font-weight: 500; letter-spacing: -0.02em; }
+  .v3-row .desc { color: var(--fg-2); font-size: 14px; line-height: 1.5; }
+  .v3-row .arrow { font-family:'JetBrains Mono'; font-size: 18px; color: var(--fg-2); text-align: right; transition: transform 0.2s, color 0.2s; }
+  .v3-row:hover .arrow { color: var(--fg-0); transform: translateX(6px); }
+  .v3-row.primary .lbl { color: var(--gold); }
+  .v3-row.primary .lbl::before {
+    content: "★"; margin-right: 12px; color: var(--gold); font-size: 18px; vertical-align: middle;
+  }
+
+  /* ── variant switching ── */
+  .variant { display: none; }
+  .variant.is-active { display: block; }
+
+  /* footer (shared) */
+  .footer {
+    border-top: 1px solid var(--line);
+    padding: 28px 32px;
+    display: flex; justify-content: space-between; align-items: center;
+    color: var(--fg-3); font-family:'JetBrains Mono'; font-size: 11px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .footer .dotty { display: flex; gap: 8px; align-items: center; }
+  .footer .dotty .b, .footer .dotty .r { width: 8px; height: 8px; border-radius: 2px; }
+  .footer .dotty .b { background: var(--blue); }
+  .footer .dotty .r { background: var(--red); }
+
+  @media (max-width: 1024px) {
+    .v1-split { grid-template-columns: 1fr; }
+    .v1-vs { display: none; }
+    .v1-side.blue { text-align: left; }
+    .v1-actions { grid-template-columns: 1fr 1fr; }
+    .v1-meta { grid-template-columns: 1fr 1fr; }
+    .v2-grid { grid-template-columns: 1fr; }
+    .v2-modules { grid-template-columns: 1fr; }
+    .v2-stats { grid-template-columns: 1fr 1fr; }
+    .nav { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Top Bar ── -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="/">
+      <span class="brand-mark"></span>
+      <span class="brand-text">Team Maker<span class="brand-sub">/ LoL</span></span>
+    </a>
+    <nav class="nav">
+      <a href="/players">プレイヤー</a>
+      <a href="/players/new">登録</a>
+      <a href="/matches">試合履歴</a>
+      <a class="cta" href="/team-maker">チーム作成 →</a>
+    </nav>
+  </div>
+</header>
+
+<!-- ════════════════════════════════════════════════════════════════
+     VARIANT 1 — SPLIT HERO
+     ════════════════════════════════════════════════════════════════ -->
+<section class="variant" data-variant="split" data-screen-label="Variant — Split Hero">
+  <div class="v1-hero">
+    <div class="v1-split">
+      <div class="v1-side blue">
+        <div>
+          <div class="side-tag"><span>BLUE SIDE</span><span class="dot"></span></div>
+          <h2>Bal-<br/>anced.</h2>
+          <div class="hex">// avg rate · 1842</div>
+        </div>
+        <div class="ros">
+          <div class="ros-row"><span class="name">Konny</span><span class="rate mono">2210</span><span class="role">TOP</span></div>
+          <div class="ros-row"><span class="name">Saito</span><span class="rate mono">1980</span><span class="role">JNG</span></div>
+          <div class="ros-row"><span class="name">Yura</span><span class="rate mono">1850</span><span class="role">MID</span></div>
+          <div class="ros-row"><span class="name">Mochi</span><span class="rate mono">1700</span><span class="role">ADC</span></div>
+          <div class="ros-row"><span class="name">Pyon</span><span class="rate mono">1470</span><span class="role">SUP</span></div>
+        </div>
+      </div>
+
+      <div class="v1-vs"></div>
+
+      <div class="v1-side red">
+        <div>
+          <div class="side-tag"><span class="dot"></span><span>RED SIDE</span></div>
+          <h2>Fair<br/>fight.</h2>
+          <div class="hex">// avg rate · 1838</div>
+        </div>
+        <div class="ros">
+          <div class="ros-row"><span class="role">TOP</span><span class="name">Riku</span><span class="rate mono">2150</span></div>
+          <div class="ros-row"><span class="role">JNG</span><span class="name">Hiro</span><span class="rate mono">2010</span></div>
+          <div class="ros-row"><span class="role">MID</span><span class="name">Kiri</span><span class="rate mono">1820</span></div>
+          <div class="ros-row"><span class="role">ADC</span><span class="name">Nao</span><span class="rate mono">1730</span></div>
+          <div class="ros-row"><span class="role">SUP</span><span class="name">Toi</span><span class="rate mono">1480</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="v1-meta">
+    <div class="cell"><div class="k">Δ Rate Diff</div><div class="v">4<span class="unit">pts</span></div></div>
+    <div class="cell"><div class="k">Players Pool</div><div class="v">42</div></div>
+    <div class="cell"><div class="k">Matches Logged</div><div class="v">137</div></div>
+    <div class="cell"><div class="k">Last Build</div><div class="v">21:42<span class="unit">JST</span></div></div>
+  </div>
+
+  <div class="container">
+    <div class="v1-actions">
+      <a class="action-card primary" href="/team-maker">
+        <div class="num">01 / PRIMARY</div>
+        <h3>チーム<br/>作成</h3>
+        <p>10人を選択し、レートと希望ロールから最適なチームを自動生成します。</p>
+        <div class="cta-row"><span class="mono">START SPLIT</span><span class="arr">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </span></div>
+      </a>
+      <a class="action-card players" href="/players">
+        <span class="glyph"></span>
+        <div class="num">02 / ROSTER</div>
+        <h3>プレイヤーリスト</h3>
+        <p>登録済みプレイヤーの一覧と戦績、レートを確認できます。</p>
+        <div class="cta-row"><span class="mono">VIEW</span><span class="arr">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </span></div>
+      </a>
+      <a class="action-card new" href="/players/new">
+        <span class="glyph"></span>
+        <div class="num">03 / RECRUIT</div>
+        <h3>プレイヤー登録</h3>
+        <p>新しいプレイヤーを名前・ロール・ランクで追加します。</p>
+        <div class="cta-row"><span class="mono">ADD</span><span class="arr">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </span></div>
+      </a>
+      <a class="action-card match" href="/matches">
+        <span class="glyph"></span>
+        <div class="num">04 / HISTORY</div>
+        <h3>試合履歴</h3>
+        <p>過去の対戦記録と勝敗、レート変動を振り返ります。</p>
+        <div class="cta-row"><span class="mono">REVIEW</span><span class="arr">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+        </span></div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     VARIANT 2 — COMMAND CENTER
+     ════════════════════════════════════════════════════════════════ -->
+<section class="variant" data-variant="command" data-screen-label="Variant — Command Center">
+  <div class="v2-wrap container">
+    <div class="v2-grid">
+      <div class="v2-hero-card">
+        <div class="v2-tag"><span class="dot"></span><span>SYSTEM ONLINE · v0.3</span></div>
+        <h1>Auto-split<br/>your custom<br/>game.</h1>
+        <p class="lede">レート・希望ロール・タグから10人を均衡な2チームに振り分け。Discord 内輪戦のための小さな戦術コンソール。</p>
+        <div class="v2-cta">
+          <a class="btn btn-primary" href="/team-maker">
+            チーム作成へ
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+          </a>
+          <a class="btn btn-ghost" href="/players">ロスター</a>
+        </div>
+      </div>
+
+      <div class="v2-right">
+        <div class="v2-stats">
+          <div class="cell"><div class="k">Active Players</div><div class="v">42</div><div class="delta">+3 this week</div></div>
+          <div class="cell"><div class="k">Matches</div><div class="v">137</div><div class="delta">+12 this week</div></div>
+          <div class="cell"><div class="k">Avg. Rate</div><div class="v">1842</div><div class="delta dim">σ 384</div></div>
+          <div class="cell"><div class="k">Last Split</div><div class="v">2h<span style="color:var(--fg-3);font-size:13px;font-family:'JetBrains Mono';margin-left:4px">ago</span></div><div class="delta dim">21:42 JST</div></div>
+        </div>
+
+        <div class="v2-modules">
+          <a class="module" href="/players">
+            <div class="module-hd">
+              <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5"/><circle cx="17" cy="9" r="2.5"/><path d="M15 20c0-2.5 2-4 4-4"/></svg></span>
+              <span class="badge">42</span>
+            </div>
+            <h4>プレイヤーリスト</h4>
+            <p>登録済みのサモナーと戦績・レートを一覧。</p>
+            <span class="arr-link">View roster
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            </span>
+          </a>
+          <a class="module" href="/players/new">
+            <div class="module-hd">
+              <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg></span>
+              <span class="badge">NEW</span>
+            </div>
+            <h4>プレイヤー登録</h4>
+            <p>サモナーネーム・ロール・ランクを設定。</p>
+            <span class="arr-link">Recruit
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            </span>
+          </a>
+          <a class="module" href="/matches">
+            <div class="module-hd">
+              <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 10h18M8 3v6M16 3v6"/></svg></span>
+              <span class="badge">137</span>
+            </div>
+            <h4>試合履歴</h4>
+            <p>過去の対戦・勝敗・レート変動の記録。</p>
+            <span class="arr-link">Review
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            </span>
+          </a>
+        </div>
+
+        <div class="v2-recent">
+          <div class="v2-recent-hd">
+            <h5>Recent Matches</h5>
+            <a href="/matches">All →</a>
+          </div>
+          <div class="match-row">
+            <span class="date">04/27 21:42</span>
+            <span class="blue-team"><span class="swatch"></span>Konny · Saito · Yura · Mochi · Pyon</span>
+            <span class="vs-mini">VS</span>
+            <span class="red-team">Riku · Hiro · Kiri · Nao · Toi<span class="swatch"></span></span>
+            <span class="winner blue">BLUE WIN</span>
+          </div>
+          <div class="match-row">
+            <span class="date">04/26 22:10</span>
+            <span class="blue-team"><span class="swatch"></span>Riku · Yura · Hiro · Pyon · Toi</span>
+            <span class="vs-mini">VS</span>
+            <span class="red-team">Konny · Saito · Mochi · Nao · Kiri<span class="swatch"></span></span>
+            <span class="winner red">RED WIN</span>
+          </div>
+          <div class="match-row">
+            <span class="date">04/24 20:55</span>
+            <span class="blue-team"><span class="swatch"></span>Konny · Hiro · Kiri · Mochi · Toi</span>
+            <span class="vs-mini">VS</span>
+            <span class="red-team">Saito · Yura · Riku · Nao · Pyon<span class="swatch"></span></span>
+            <span class="winner blue">BLUE WIN</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════════════════════════════════════════════════════
+     VARIANT 3 — EDITORIAL
+     ════════════════════════════════════════════════════════════════ -->
+<section class="variant" data-variant="editorial" data-screen-label="Variant — Editorial">
+  <div class="v3-wrap">
+    <div class="v3-eyebrow"><span class="ln"></span><span>LoL · Custom Game · Internal Tool</span></div>
+    <h1 class="v3-title">10 player を <em>balanced</em> な 2 チームに、ワンクリックで。</h1>
+    <p class="v3-lede">レート・希望ロール・絶対やりたくないロールを考慮して、ブルーサイドとレッドサイドを自動で振り分ける小さなツール。</p>
+
+    <div class="v3-list">
+      <a class="v3-row primary" href="/team-maker">
+        <span class="idx">01</span>
+        <span class="lbl">チームを作成する</span>
+        <span class="desc">10人のプレイヤーを選び、希望ロールを設定して、自動でバランス分けを実行。</span>
+        <span class="arrow">→</span>
+      </a>
+      <a class="v3-row" href="/players">
+        <span class="idx">02</span>
+        <span class="lbl">プレイヤーを見る</span>
+        <span class="desc">登録済みのサモナー、勝敗、レートの一覧を確認。</span>
+        <span class="arrow">→</span>
+      </a>
+      <a class="v3-row" href="/players/new">
+        <span class="idx">03</span>
+        <span class="lbl">プレイヤーを登録する</span>
+        <span class="desc">新しいサモナーを名前・ロール・ランクで追加。</span>
+        <span class="arrow">→</span>
+      </a>
+      <a class="v3-row" href="/matches">
+        <span class="idx">04</span>
+        <span class="lbl">試合履歴を見る</span>
+        <span class="desc">過去の対戦記録、勝敗、レート変動を振り返る。</span>
+        <span class="arrow">→</span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div>© 2026 Team Maker</div>
+  <div class="dotty"><span class="b"></span><span class="mono">vs</span><span class="r"></span></div>
+  <div>built for Discord 内輪戦</div>
+</footer>
+
+<!-- React + Babel for the tweaks panel -->
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+
+<div id="tweaks-root"></div>
+
+<script type="text/babel">
+  const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+    "variant": "split",
+    "accentBlue": "#5b9dff",
+    "accentRed": "#ff5c4a"
+  }/*EDITMODE-END*/;
+
+  function applyVariant(variant) {
+    document.querySelectorAll('.variant').forEach(el => {
+      el.classList.toggle('is-active', el.dataset.variant === variant);
+    });
+  }
+  function applyAccents(blue, red) {
+    document.documentElement.style.setProperty('--blue', blue);
+    document.documentElement.style.setProperty('--red',  red);
+  }
+
+  function App() {
+    const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+    React.useEffect(() => { applyVariant(t.variant); }, [t.variant]);
+    React.useEffect(() => { applyAccents(t.accentBlue, t.accentRed); }, [t.accentBlue, t.accentRed]);
+
+    return (
+      <TweaksPanel title="Tweaks">
+        <TweakSection label="Variant" />
+        <TweakRadio
+          label="Layout"
+          value={t.variant}
+          options={[
+            { value: 'split',     label: 'Split' },
+            { value: 'command',   label: 'Console' },
+            { value: 'editorial', label: 'Editorial' },
+          ]}
+          onChange={(v) => setTweak('variant', v)}
+        />
+        <TweakSection label="Accents" />
+        <TweakColor label="Blue side" value={t.accentBlue} onChange={(v) => setTweak('accentBlue', v)} />
+        <TweakColor label="Red side"  value={t.accentRed}  onChange={(v) => setTweak('accentRed',  v)} />
+      </TweaksPanel>
+    );
+  }
+
+  // Apply initial variant immediately so first paint isn't blank
+  applyVariant(TWEAK_DEFAULTS.variant);
+  applyAccents(TWEAK_DEFAULTS.accentBlue, TWEAK_DEFAULTS.accentRed);
+
+  ReactDOM.createRoot(document.getElementById('tweaks-root')).render(<App />);
+</script>
+
+</body>
+</html>

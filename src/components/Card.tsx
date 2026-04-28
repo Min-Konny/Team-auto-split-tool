@@ -9,15 +9,16 @@ interface CardProps extends BoxProps {
 export default function Card({ children, isHoverable = true, ...props }: CardProps) {
   return (
     <Box
-      bg="white"
-      borderRadius="lg"
-      boxShadow="base"
+      bg="var(--bg-1)"
+      borderRadius="13px"
+      border="1px solid"
+      borderColor="var(--line)"
       p={4}
-      transition="all 0.2s"
-      _hover={isHoverable ? { boxShadow: 'md', transform: 'translateY(-2px)' } : undefined}
+      transition="all 0.15s"
+      _hover={isHoverable ? { borderColor: 'var(--line-2)', transform: 'translateY(-2px)' } : undefined}
       {...props}
     >
       {children}
     </Box>
   )
-} 
+}

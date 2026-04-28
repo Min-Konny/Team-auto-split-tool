@@ -1,1294 +1,262 @@
-import { useState, useEffect } from 'react'
-import {
-  Box,
-  Button,
-  Container,
-  Heading,
-  VStack,
-  HStack,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Badge,
-  IconButton,
-  Input,
-  InputGroup,
-  InputLeftElement,
-  useColorModeValue,
-  Text,
-  Tag,
-  TagLabel,
-  Select,
-  Flex,
-  Wrap,
-  WrapItem,
-  useToast,
-  TagCloseButton,
-  NumberInput,
-  NumberInputField,
-  NumberInputStepper,
-  NumberIncrementStepper,
-  NumberDecrementStepper,
-  Checkbox,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalFooter,
-  ModalBody,
-  ModalCloseButton,
-  useDisclosure,
-  SimpleGrid,
-  FormControl,
-  FormLabel,
-  Card as ChakraCard,
-  CardBody,
-  CardHeader,
-} from '@chakra-ui/react'
-import { SearchIcon, AddIcon, EditIcon, CheckIcon, CloseIcon, DeleteIcon, TimeIcon } from '@chakra-ui/icons'
-import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
-import { Player, GameRole, RANK_RATES, Rank, Match } from '@/types'
-import Layout from '@/components/Layout'
-import Card from '@/components/Card'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import Header from '@/components/Header'
+import RoleBadge from '@/components/RoleBadge'
+import { collection, deleteDoc, doc, getDocs, orderBy, query, updateDoc } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
+import { GameRole, Match, Player } from '@/types'
 
-// 利用可能なタグオプション
-const AVAILABLE_TAGS = ['249', 'SHIFT', 'きらくに']
+const ROLES: GameRole[] = [GameRole.TOP, GameRole.JUNGLE, GameRole.MID, GameRole.ADC, GameRole.SUP]
+const DEFAULT_TAGS = ['249', 'SHIFT', 'その他', '交流']
 
-interface EditingState {
-  id: string | null;
-  newName: string;
+type PlayerWithId = Player & { id: string }
+type MatchWithPlayer = Match & { playerTeam: 'BLUE' | 'RED'; playerRole: string; isWinner: boolean }
+
+const getRankFromRate = (rate: number) => {
+  if (rate >= 3000) return 'CHALLENGER'
+  if (rate >= 2700) return 'GRANDMASTER'
+  if (rate >= 2500) return 'MASTER'
+  if (rate >= 2200) return 'DIAMOND'
+  if (rate >= 2000) return 'EMERALD'
+  if (rate >= 1900) return 'PLATINUM'
+  if (rate >= 1700) return 'GOLD'
+  if (rate >= 1500) return 'SILVER'
+  if (rate >= 1300) return 'BRONZE'
+  if (rate >= 600) return 'IRON'
+  return 'UNRANKED'
 }
 
+const getRankColor = (rank: string) =>
+  ({
+    CHALLENGER: 'var(--gold)',
+    GRANDMASTER: 'var(--r-top)',
+    MASTER: 'var(--r-adc)',
+    DIAMOND: 'var(--blue)',
+    EMERALD: 'oklch(0.74 0.18 155)',
+    PLATINUM: 'oklch(0.72 0.15 180)',
+    GOLD: 'var(--gold)',
+    SILVER: '#a8a9ad',
+    BRONZE: '#cd7f32',
+    IRON: 'var(--fg-3)',
+    UNRANKED: 'var(--fg-3)',
+  }[rank] || 'var(--fg-2)')
 
-interface EditingUnwantedRoles {
-  id: string;
-  unwantedRoles: GameRole[];
-}
-
-export default function Players() {
-  const [players, setPlayers] = useState<(Player & { id: string })[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
+export default function PlayersPage() {
+  const [players, setPlayers] = useState<PlayerWithId[]>([])
+  const [search, setSearch] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [editing, setEditing] = useState<{ id: string; newName: string } | null>(null)
-  const [editingTags, setEditingTags] = useState<{ id: string; tags: string[] } | null>(null)
-  const [editingUnwantedRoles, setEditingUnwantedRoles] = useState<EditingUnwantedRoles | null>(null)
-  const [tagInput, setTagInput] = useState('')
-  const [rateModalPlayer, setRateModalPlayer] = useState<(Player & { id: string }) | null>(null)
-  const [tempMainRate, setTempMainRate] = useState(0)
-  const [tempSubRate, setTempSubRate] = useState(0)
-  const { isOpen: isRateModalOpen, onOpen: onRateModalOpen, onClose: onRateModalClose } = useDisclosure()
-  
-  // 統合編集モーダルの状態
-  const [editModalPlayer, setEditModalPlayer] = useState<(Player & { id: string }) | null>(null)
-  const [tempEditName, setTempEditName] = useState('')
-  const [tempEditNickname, setTempEditNickname] = useState('')
-  const [tempEditMainRate, setTempEditMainRate] = useState(0)
-  const [tempEditSubRate, setTempEditSubRate] = useState(0)
-  const [tempEditTags, setTempEditTags] = useState<string[]>([])
-  const [tempEditUnwantedRoles, setTempEditUnwantedRoles] = useState<GameRole[]>([])
-  const { isOpen: isEditModalOpen, onOpen: onEditModalOpen, onClose: onEditModalClose } = useDisclosure()
-  const [showRankReference, setShowRankReference] = useState(false)
-  const borderColor = useColorModeValue('gray.200', 'gray.700')
-  const toast = useToast()
+  const [sortBy, setSortBy] = useState<'mainRate' | 'subRate' | 'wr' | 'name'>('mainRate')
 
-  // 履歴モーダルの状態
-  const [historyModalPlayer, setHistoryModalPlayer] = useState<(Player & { id: string }) | null>(null)
-  const [playerMatches, setPlayerMatches] = useState<Array<Match & { playerTeam: 'BLUE' | 'RED', playerRole: string, isWinner: boolean }>>([])
-  const { isOpen: isHistoryModalOpen, onOpen: onHistoryModalOpen, onClose: onHistoryModalClose } = useDisclosure()
+  const [editTarget, setEditTarget] = useState<PlayerWithId | null>(null)
+  const [historyTarget, setHistoryTarget] = useState<PlayerWithId | null>(null)
+  const [history, setHistory] = useState<MatchWithPlayer[]>([])
+
+  const [name, setName] = useState('')
+  const [nickname, setNickname] = useState('')
+  const [mainRate, setMainRate] = useState(0)
+  const [subRate, setSubRate] = useState(0)
+  const [tags, setTags] = useState<string[]>([])
+  const [unwantedRoles, setUnwantedRoles] = useState<GameRole[]>([])
 
   const fetchPlayers = async () => {
-    const querySnapshot = await getDocs(collection(db, 'players'))
-    const playersData = querySnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as (Player & { id: string })[]
-    setPlayers(playersData)
+    const snapshot = await getDocs(collection(db, 'players'))
+    setPlayers(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as PlayerWithId)))
   }
 
   useEffect(() => {
-    fetchPlayers()
+    fetchPlayers().catch(console.error)
   }, [])
 
-  const getRoleColor = (role: GameRole) => {
-    const colors = {
-      TOP: 'red',
-      JUNGLE: 'green',
-      MID: 'blue',
-      ADC: 'purple',
-      SUP: 'orange'
-    }
-    return colors[role]
-  }
+  const availableTags = useMemo(
+    () => Array.from(new Set([...DEFAULT_TAGS, ...players.flatMap((p) => p.tags || [])])).filter(Boolean),
+    [players]
+  )
 
-  const handleEditClick = (player: Player & { id: string }) => {
-    setEditing({ 
-      id: player.id, 
-      newName: player.name
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const list = players.filter((p) => {
+      const display = p.nickname || p.name
+      const matchName = display.toLowerCase().includes(q) || p.name.toLowerCase().includes(q)
+      const matchTag = selectedTags.length === 0 || selectedTags.some((tag) => p.tags?.includes(tag))
+      return matchName && matchTag
     })
-  }
 
-  const handleCancelEdit = () => {
-    setEditing(null)
-  }
-
-  const handleSaveEdit = async (playerId: string) => {
-    if (!editing?.newName.trim()) {
-      toast({
-        title: 'エラー',
-        description: '名前を入力してください',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-      return
-    }
-
-    try {
-      const playerRef = doc(db, 'players', playerId)
-      await updateDoc(playerRef, {
-        name: editing.newName.trim()
-      })
-
-      setPlayers(players.map(p => 
-        p.id === playerId 
-          ? { ...p, name: editing.newName.trim() }
-          : p
-      ))
-
-      setEditing(null)
-
-      toast({
-        title: '更新完了',
-        description: 'プレイヤー名を更新しました',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      })
-    } catch (error) {
-      toast({
-        title: 'エラー',
-        description: '更新に失敗しました',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-    }
-  }
-
-  // タグを追加
-  const addTag = (playerId: string) => {
-    if (tagInput.trim() && editingTags && !editingTags.tags.includes(tagInput.trim())) {
-      setEditingTags({
-        ...editingTags,
-        tags: [...editingTags.tags, tagInput.trim()]
-      })
-      setTagInput('')
-    }
-  }
-
-  // タグを削除
-  const removeTag = (playerId: string, tagToRemove: string) => {
-    if (editingTags) {
-      setEditingTags({
-        ...editingTags,
-        tags: editingTags.tags.filter(tag => tag !== tagToRemove)
-      })
-    }
-  }
-
-  // タグ編集を開始
-  const handleEditTagsClick = (player: Player & { id: string }) => {
-    setEditingTags({
-      id: player.id,
-      tags: player.tags || []
-    })
-  }
-
-  // タグ編集を保存
-  const handleSaveTags = async (playerId: string) => {
-    if (!editingTags) return
-
-    try {
-      const playerRef = doc(db, 'players', playerId)
-      await updateDoc(playerRef, {
-        tags: editingTags.tags.length > 0 ? editingTags.tags : null
-      })
-
-      // プレイヤーリストを更新
-      setPlayers(players.map(player => 
-        player.id === playerId 
-          ? { ...player, tags: editingTags.tags.length > 0 ? editingTags.tags : undefined }
-          : player
-      ))
-
-      setEditingTags(null)
-      toast({
-        title: '成功',
-        description: 'タグを更新しました',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      })
-    } catch (error) {
-      console.error('Error updating tags:', error)
-      toast({
-        title: 'エラー',
-        description: 'タグの更新に失敗しました',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-    }
-  }
-
-  // タグ編集をキャンセル
-  const handleCancelTags = () => {
-    setEditingTags(null)
-    setTagInput('')
-  }
-
-  const handleEditRatesClick = (player: Player & { id: string }) => {
-    setRateModalPlayer(player)
-    setTempMainRate(player.mainRate)
-    setTempSubRate(player.subRate)
-    onRateModalOpen()
-  }
-
-
-  const handleSaveRatesModal = async () => {
-    if (!rateModalPlayer) return
-
-    try {
-      const playerRef = doc(db, 'players', rateModalPlayer.id)
-      await updateDoc(playerRef, {
-        mainRate: tempMainRate,
-        subRate: tempSubRate
-      })
-
-      // プレイヤーリストを更新
-      setPlayers(players.map(player => 
-        player.id === rateModalPlayer.id 
-          ? { ...player, mainRate: tempMainRate, subRate: tempSubRate }
-          : player
-      ))
-
-      onRateModalClose()
-      setRateModalPlayer(null)
-      toast({
-        title: '成功',
-        description: 'レートを更新しました',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      })
-    } catch (error) {
-      console.error('Error updating rates:', error)
-      toast({
-        title: 'エラー',
-        description: 'レートの更新に失敗しました',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-    }
-  }
-
-  const handleCancelRatesModal = () => {
-    onRateModalClose()
-    setRateModalPlayer(null)
-  }
-
-  // プレイヤー削除関数
-  const handleDeletePlayer = async (playerId: string, playerName: string) => {
-    if (!window.confirm(`プレイヤー「${playerName}」を削除しますか？\n\nこの操作は取り消せません。`)) {
-      return
-    }
-
-    try {
-      const playerRef = doc(db, 'players', playerId)
-      await deleteDoc(playerRef)
-
-      // プレイヤーリストから削除
-      setPlayers(players.filter(p => p.id !== playerId))
-
-      toast({
-        title: '削除完了',
-        description: `プレイヤー「${playerName}」を削除しました`,
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      })
-    } catch (error) {
-      console.error('Error deleting player:', error)
-      toast({
-        title: 'エラー',
-        description: 'プレイヤーの削除に失敗しました',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-    }
-  }
-
-
-  // 絶対にやりたくないロール編集を開始
-  const handleEditUnwantedRolesClick = (player: Player & { id: string }) => {
-    setEditingUnwantedRoles({
-      id: player.id,
-      unwantedRoles: player.unwantedRoles || []
-    })
-  }
-
-  // 絶対にやりたくないロール編集を保存
-  const handleSaveUnwantedRoles = async (playerId: string) => {
-    if (!editingUnwantedRoles) return
-
-    try {
-      const playerRef = doc(db, 'players', playerId)
-      await updateDoc(playerRef, {
-        unwantedRoles: editingUnwantedRoles.unwantedRoles.length > 0 ? editingUnwantedRoles.unwantedRoles : []
-      })
-
-      // プレイヤーリストを更新
-      setPlayers(players.map(player => 
-        player.id === playerId 
-          ? { ...player, unwantedRoles: editingUnwantedRoles.unwantedRoles.length > 0 ? editingUnwantedRoles.unwantedRoles : undefined }
-          : player
-      ))
-
-      setEditingUnwantedRoles(null)
-      toast({
-        title: '成功',
-        description: '絶対にやりたくないロールを更新しました',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      })
-    } catch (error) {
-      console.error('Error updating unwanted roles:', error)
-      toast({
-        title: 'エラー',
-        description: '絶対にやりたくないロールの更新に失敗しました',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-    }
-  }
-
-  // 絶対にやりたくないロール編集をキャンセル
-  const handleCancelUnwantedRoles = () => {
-    setEditingUnwantedRoles(null)
-  }
-
-  // 絶対にやりたくないロールの選択/解除
-  const handleUnwantedRoleToggle = (role: GameRole) => {
-    if (editingUnwantedRoles) {
-      const currentRoles = editingUnwantedRoles.unwantedRoles
-      if (currentRoles.includes(role)) {
-        setEditingUnwantedRoles({
-          ...editingUnwantedRoles,
-          unwantedRoles: currentRoles.filter(r => r !== role)
-        })
-      } else {
-        setEditingUnwantedRoles({
-          ...editingUnwantedRoles,
-          unwantedRoles: [...currentRoles, role]
-        })
+    return list.sort((a, b) => {
+      if (sortBy === 'mainRate') return b.mainRate - a.mainRate
+      if (sortBy === 'subRate') return b.subRate - a.subRate
+      if (sortBy === 'wr') {
+        const aw = a.stats.wins + a.stats.losses === 0 ? 0 : Math.round((a.stats.wins / (a.stats.wins + a.stats.losses)) * 100)
+        const bw = b.stats.wins + b.stats.losses === 0 ? 0 : Math.round((b.stats.wins / (b.stats.wins + b.stats.losses)) * 100)
+        return bw - aw
       }
-    }
+      return (a.nickname || a.name).localeCompare(b.nickname || b.name, 'ja')
+    })
+  }, [players, search, selectedTags, sortBy])
+
+  const openEdit = (player: PlayerWithId) => {
+    setEditTarget(player)
+    setName(player.name)
+    setNickname(player.nickname || '')
+    setMainRate(player.mainRate)
+    setSubRate(player.subRate)
+    setTags([...(player.tags || [])])
+    setUnwantedRoles([...(player.unwantedRoles || [])])
   }
 
-
-
-
-  // 統合編集モーダルを開く
-  const handleEditPlayerClick = (player: Player & { id: string }) => {
-    setEditModalPlayer(player)
-    setTempEditName(player.name)
-    setTempEditNickname(player.nickname || '')
-    setTempEditMainRate(player.mainRate)
-    setTempEditSubRate(player.subRate)
-    setTempEditTags(player.tags || [])
-    setTempEditUnwantedRoles(player.unwantedRoles || [])
-    onEditModalOpen()
+  const saveEdit = async () => {
+    if (!editTarget) return
+    await updateDoc(doc(db, 'players', editTarget.id), {
+      name: name.trim(),
+      nickname: nickname.trim() || null,
+      mainRate,
+      subRate,
+      tags,
+      unwantedRoles,
+    })
+    await fetchPlayers()
+    setEditTarget(null)
   }
 
-  // 統合編集モーダルを保存
-  const handleSaveEditModal = async () => {
-    if (!editModalPlayer) return
+  const removePlayer = async (player: PlayerWithId) => {
+    if (!window.confirm(`${player.nickname || player.name} を削除しますか？`)) return
+    await deleteDoc(doc(db, 'players', player.id))
+    await fetchPlayers()
+  }
 
-    try {
-      const playerRef = doc(db, 'players', editModalPlayer.id)
-      await updateDoc(playerRef, {
-        name: tempEditName,
-        nickname: tempEditNickname.trim() || null,
-        mainRate: tempEditMainRate,
-        subRate: tempEditSubRate,
-        tags: tempEditTags,
-        unwantedRoles: tempEditUnwantedRoles
+  const openHistory = async (player: PlayerWithId) => {
+    setHistoryTarget(player)
+    const snapshot = await getDocs(query(collection(db, 'matches'), orderBy('date', 'desc')))
+    const rows = snapshot.docs
+      .map((d) => ({ id: d.id, ...d.data() } as Match))
+      .filter((m) => m.players.some((p) => p.playerId === player.id))
+      .map((m) => {
+        const me = m.players.find((p) => p.playerId === player.id)!
+        return { ...m, playerTeam: me.team, playerRole: me.role, isWinner: me.team === m.winner }
       })
-
-      // ローカルのプレイヤーリストを更新
-      setPlayers(players.map(player => 
-        player.id === editModalPlayer.id 
-          ? { 
-              ...player, 
-              name: tempEditName,
-              nickname: tempEditNickname.trim() || undefined,
-              mainRate: tempEditMainRate,
-              subRate: tempEditSubRate,
-              tags: tempEditTags,
-              unwantedRoles: tempEditUnwantedRoles
-            }
-          : player
-      ))
-
-      toast({
-        title: '更新完了',
-        description: 'プレイヤー情報を更新しました',
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      })
-
-      onEditModalClose()
-    } catch (error) {
-      console.error('Update error:', error)
-      toast({
-        title: '更新エラー',
-        description: 'プレイヤー情報の更新に失敗しました',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-    }
+    setHistory(rows)
   }
-
-  // 統合編集モーダルをキャンセル
-  const handleCancelEditModal = () => {
-    setEditModalPlayer(null)
-    setTempEditName('')
-    setTempEditNickname('')
-    setTempEditMainRate(0)
-    setTempEditSubRate(0)
-    setTempEditTags([])
-    setTempEditUnwantedRoles([])
-    onEditModalClose()
-  }
-
-  // 履歴モーダルを開く
-  const handleViewHistoryClick = async (player: Player & { id: string }) => {
-    setHistoryModalPlayer(player)
-    
-    try {
-      // 試合情報を取得
-      const matchesSnapshot = await getDocs(
-        query(collection(db, 'matches'), orderBy('date', 'desc'))
-      )
-      
-      // このプレイヤーが参加した試合をフィルタリング
-      const matches = matchesSnapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() } as Match))
-        .filter((match) => 
-          match.players.some((p) => p.playerId === player.id)
-        )
-        .map((match) => {
-          const playerInMatch = match.players.find((p) => p.playerId === player.id)!
-          return {
-            ...match,
-            playerTeam: playerInMatch.team,
-            playerRole: playerInMatch.role,
-            isWinner: playerInMatch.team === match.winner,
-          }
-        })
-      
-      setPlayerMatches(matches)
-      onHistoryModalOpen()
-    } catch (error) {
-      console.error('Error fetching match history:', error)
-      toast({
-        title: 'エラー',
-        description: '試合履歴の取得に失敗しました',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      })
-    }
-  }
-
-  // 履歴モーダルを閉じる
-  const handleCloseHistoryModal = () => {
-    setHistoryModalPlayer(null)
-    setPlayerMatches([])
-    onHistoryModalClose()
-  }
-
-  // 利用可能なタグを取得
-  const availableTags = Array.from(
-    new Set(
-      players
-        .flatMap(player => player.tags || [])
-        .filter(tag => tag.trim() !== '')
-    )
-  ).sort()
-
-  // フィルタリングされたプレイヤー
-  const filteredPlayers = players.filter((player) => {
-    const displayName = player.nickname || player.name
-    const matchesSearch = displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         player.name.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesTags = selectedTags.length === 0 || 
-      selectedTags.some(tag => player.tags?.includes(tag))
-    return matchesSearch && matchesTags
-  })
 
   return (
-    <Layout>
-      <VStack spacing={6} align="stretch">
-        <HStack justify="space-between" align="center">
-          <Heading color="blue.600" fontSize={{ base: '2xl', md: '3xl' }}>
-            『プレイヤー』一覧
-          </Heading>
-          <HStack spacing={3}>
-            <Link href="/players/new" passHref>
-              <Button
-                as="a"
-                colorScheme="blue"
-                size="md"
-                leftIcon={<AddIcon />}
-                boxShadow="md"
-                _hover={{ 
-                  transform: 'translateY(-2px)',
-                  boxShadow: 'lg'
-                }}
-              >
-                新規登録
-              </Button>
-            </Link>
-          </HStack>
-        </HStack>
+    <div>
+      <Header />
+      <main className="page">
+        <div className="head">
+          <div className="title">
+            プレイヤー一覧 <span>{filtered.length} / {players.length} 件</span>
+          </div>
+          <Link href="/players/new" className="btnAdd">新規登録</Link>
+        </div>
 
-        <Card>
-          <Box p={4}>
-            <VStack spacing={4} align="stretch">
-              {/* 検索バー */}
-              <InputGroup>
-                <InputLeftElement pointerEvents="none">
-                  <SearchIcon color="gray.300" />
-                </InputLeftElement>
-                <Input
-                  placeholder="プレイヤー名で検索..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  size="md"
-                />
-              </InputGroup>
+        <div className="filters">
+          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="名前で検索" />
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
+            <option value="mainRate">メインレート順</option>
+            <option value="subRate">サブレート順</option>
+            <option value="wr">勝率順</option>
+            <option value="name">名前順</option>
+          </select>
+          <div className="chips">
+            {availableTags.map((t) => (
+              <button key={t} className={selectedTags.includes(t) ? 'active' : ''} onClick={() => setSelectedTags((p) => p.includes(t) ? p.filter((x) => x !== t) : [...p, t])}>
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
 
-              {/* タグフィルター */}
-              {availableTags.length > 0 && (
-                <Box>
-                  <Text fontSize="sm" fontWeight="bold" mb={2}>
-                    タグで絞り込み:
-                  </Text>
-                  <Wrap spacing={2}>
-                    {availableTags.map((tag) => (
-                      <WrapItem key={tag}>
-                        <Tag
-                          size="md"
-                          variant={selectedTags.includes(tag) ? "solid" : "outline"}
-                          colorScheme={selectedTags.includes(tag) ? "blue" : "gray"}
-                          cursor="pointer"
-                          onClick={() => {
-                            if (selectedTags.includes(tag)) {
-                              setSelectedTags(selectedTags.filter(t => t !== tag))
-                            } else {
-                              setSelectedTags([...selectedTags, tag])
-                            }
-                          }}
-                          _hover={{ opacity: 0.8 }}
-                        >
-                          <TagLabel>{tag}</TagLabel>
-                        </Tag>
-                      </WrapItem>
-                    ))}
-                  </Wrap>
-                  {selectedTags.length > 0 && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      colorScheme="gray"
-                      onClick={() => setSelectedTags([])}
-                      mt={2}
-                    >
-                      フィルターをクリア
-                    </Button>
-                  )}
-                </Box>
-              )}
-            </VStack>
-          </Box>
+        <div className="table">
+          <div className="row hd">{['プレイヤー', 'Role', 'Main', 'Sub', 'WR', 'タグ', 'NG', ''].map((h) => <div key={h}>{h}</div>)}</div>
+          {filtered.map((p) => {
+            const total = p.stats.wins + p.stats.losses
+            const wr = total === 0 ? 0 : Math.round((p.stats.wins / total) * 100)
+            return (
+              <div className="row" key={p.id}>
+                <div><div className="nm">{p.nickname || p.name}</div>{p.nickname && <div className="sub">{p.name}</div>}</div>
+                <div><RoleBadge role={p.mainRole} /></div>
+                <div><div className="num">{p.mainRate}</div><div className="sub" style={{ color: getRankColor(getRankFromRate(p.mainRate)) }}>{getRankFromRate(p.mainRate)}</div></div>
+                <div><div className="num">{p.subRate}</div><div className="sub" style={{ color: getRankColor(getRankFromRate(p.subRate)) }}>{getRankFromRate(p.subRate)}</div></div>
+                <div><div className="num" style={{ color: wr >= 50 ? 'var(--ok)' : 'var(--red)' }}>{wr}%</div><div className="sub">{p.stats.wins}W {p.stats.losses}L</div></div>
+                <div className="chips mini">{(p.tags || []).map((t) => <span key={t}>{t}</span>)}</div>
+                <div className="chips mini">{(p.unwantedRoles || []).map((r) => <span key={r} className="ng">{r}</span>)}</div>
+                <div className="acts">
+                  <button onClick={() => openHistory(p)}>⏱</button>
+                  <button onClick={() => openEdit(p)}>✎</button>
+                  <button onClick={() => removePlayer(p)}>✕</button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </main>
 
-          <Box overflowX="auto">
-            <Table variant="simple" size="sm" minW="1200px">
-              <Thead bg="gray.50">
-                <Tr>
-                  <Th borderColor={borderColor}>名前</Th>
-                  <Th borderColor={borderColor}>メインロール</Th>
-                  <Th borderColor={borderColor}>タグ</Th>
-                  <Th borderColor={borderColor}>絶対にやりたくないロール</Th>
-                  <Th borderColor={borderColor} isNumeric>勝率</Th>
-                  <Th borderColor={borderColor} isNumeric>メインロールレート</Th>
-                  <Th borderColor={borderColor} isNumeric>サブロールレート</Th>
-                  <Th borderColor={borderColor} width="120px"></Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {filteredPlayers.map((player) => {
-                  const winRate = player.stats.wins + player.stats.losses > 0
-                    ? Math.round((player.stats.wins / (player.stats.wins + player.stats.losses)) * 100)
-                    : 0
+      {editTarget && (
+        <div className="backdrop" onClick={(e) => e.target === e.currentTarget && setEditTarget(null)}>
+          <div className="modal">
+            <h3>{editTarget.nickname || editTarget.name} を編集</h3>
+            <div className="grid">
+              <input value={name} onChange={(e) => setName(e.target.value)} />
+              <input value={nickname} onChange={(e) => setNickname(e.target.value)} />
+              <input type="number" value={mainRate} onChange={(e) => setMainRate(Number(e.target.value) || 0)} />
+              <input type="number" value={subRate} onChange={(e) => setSubRate(Number(e.target.value) || 0)} />
+            </div>
+            <div className="chips">
+              {availableTags.map((t) => <button key={t} className={tags.includes(t) ? 'active' : ''} onClick={() => setTags((p) => p.includes(t) ? p.filter((x) => x !== t) : [...p, t])}>{t}</button>)}
+            </div>
+            <div className="chips">
+              {ROLES.map((r) => <button key={r} className={unwantedRoles.includes(r) ? 'active ng' : ''} onClick={() => setUnwantedRoles((p) => p.includes(r) ? p.filter((x) => x !== r) : [...p, r])}>{r}</button>)}
+            </div>
+            <div className="acts"><button onClick={() => setEditTarget(null)}>キャンセル</button><button onClick={saveEdit}>保存</button></div>
+          </div>
+        </div>
+      )}
 
-                  const isEditing = editing?.id === player.id
-                  const isEditingTags = editingTags?.id === player.id
-                  const isEditingUnwantedRoles = editingUnwantedRoles?.id === player.id
+      {historyTarget && (
+        <div className="backdrop" onClick={(e) => e.target === e.currentTarget && setHistoryTarget(null)}>
+          <div className="modal wide">
+            <h3>{historyTarget.nickname || historyTarget.name} の試合履歴</h3>
+            {history.map((h) => (
+              <div key={h.id} className="hist">
+                <span>{new Date(h.date.seconds * 1000).toLocaleString('ja-JP')}</span>
+                <span>{h.playerTeam}</span>
+                <RoleBadge role={h.playerRole} sm />
+                <span>{h.isWinner ? 'WIN' : 'LOSS'}</span>
+              </div>
+            ))}
+            {history.length === 0 && <div className="sub">試合履歴がありません</div>}
+          </div>
+        </div>
+      )}
 
-                  return (
-                    <Tr 
-                      key={player.id}
-                      _hover={{ bg: 'gray.50' }}
-                      transition="background-color 0.2s"
-                    >
-                      <Td borderColor={borderColor}>
-                        {isEditing ? (
-                          <Input
-                            value={editing.newName}
-                            onChange={(e) => setEditing({ ...editing, newName: e.target.value })}
-                            size="sm"
-                            width="200px"
-                          />
-                        ) : (
-                          player.nickname || player.name
-                        )}
-                      </Td>
-                      <Td borderColor={borderColor}>
-                        <Badge 
-                          colorScheme={getRoleColor(player.mainRole)}
-                          fontSize="sm"
-                          px={2}
-                          py={1}
-                          borderRadius="full"
-                        >
-                          {player.mainRole}
-                        </Badge>
-                      </Td>
-                      <Td borderColor={borderColor}>
-                        {isEditingTags ? (
-                          <VStack spacing={2} align="stretch">
-                            <Wrap spacing={2}>
-                              {AVAILABLE_TAGS.map((tag) => (
-                                <WrapItem key={tag}>
-                                  <Checkbox
-                                    isChecked={editingTags.tags.includes(tag)}
-                                    onChange={() => {
-                                      if (editingTags.tags.includes(tag)) {
-                                        removeTag(player.id, tag)
-                                      } else {
-                                        setEditingTags({
-                                          ...editingTags,
-                                          tags: [...editingTags.tags, tag]
-                                        })
-                                      }
-                                    }}
-                                    colorScheme="blue"
-                                    size="sm"
-                                  >
-                                    <Tag
-                                      size="sm"
-                                      variant={editingTags.tags.includes(tag) ? "solid" : "outline"}
-                                      colorScheme="blue"
-                                    >
-                                      <TagLabel>{tag}</TagLabel>
-                                    </Tag>
-                                  </Checkbox>
-                                </WrapItem>
-                              ))}
-                            </Wrap>
-                          </VStack>
-                        ) : (
-                          <Wrap spacing={1}>
-                            {player.tags?.map((tag, index) => (
-                              <WrapItem key={index}>
-                                <Tag
-                                  size="sm"
-                                  variant="outline"
-                                  colorScheme="blue"
-                                  cursor="pointer"
-                                  onClick={() => {
-                                    if (!selectedTags.includes(tag)) {
-                                      setSelectedTags([...selectedTags, tag])
-                                    }
-                                  }}
-                                  _hover={{ opacity: 0.8 }}
-                                >
-                                  <TagLabel>{tag}</TagLabel>
-                                </Tag>
-                              </WrapItem>
-                            )) || (
-                              <Text fontSize="sm" color="gray.400">
-                                タグなし
-                              </Text>
-                            )}
-                          </Wrap>
-                        )}
-                      </Td>
-                      <Td borderColor={borderColor}>
-                        {isEditingUnwantedRoles ? (
-                          <VStack spacing={2} align="stretch">
-                            <Wrap spacing={2}>
-                              {Object.values(GameRole).map((role) => (
-                                <WrapItem key={role}>
-                                  <Checkbox
-                                    isChecked={editingUnwantedRoles.unwantedRoles.includes(role)}
-                                    onChange={() => handleUnwantedRoleToggle(role)}
-                                    colorScheme="red"
-                                    size="sm"
-                                  >
-                                    <Tag
-                                      size="sm"
-                                      variant={editingUnwantedRoles.unwantedRoles.includes(role) ? "solid" : "outline"}
-                                      colorScheme="red"
-                                    >
-                                      <TagLabel>{role}</TagLabel>
-                                    </Tag>
-                                  </Checkbox>
-                                </WrapItem>
-                              ))}
-                            </Wrap>
-                          </VStack>
-                        ) : (
-                          <Wrap spacing={1}>
-                            {player.unwantedRoles?.map((role, index) => (
-                              <WrapItem key={index}>
-                                <Tag
-                                  size="sm"
-                                  variant="outline"
-                                  colorScheme="red"
-                                >
-                                  <TagLabel>{role}</TagLabel>
-                                </Tag>
-                              </WrapItem>
-                            )) || (
-                              <Text fontSize="sm" color="gray.400">
-                                なし
-                              </Text>
-                            )}
-                          </Wrap>
-                        )}
-                      </Td>
-                      <Td borderColor={borderColor} isNumeric>
-                        <Text 
-                          color={winRate >= 50 ? 'green.500' : 'red.500'}
-                          fontWeight="bold"
-                        >
-                          {winRate}%
-                        </Text>
-                        <Text fontSize="xs" color="gray.500">
-                          ({player.stats.wins}勝{player.stats.losses}敗)
-                        </Text>
-                      </Td>
-                      {/* メインロールレート */}
-                      <Td borderColor={borderColor} isNumeric>
-                        <Text fontWeight="bold" color="blue.600">
-                          {player.mainRate}
-                        </Text>
-                      </Td>
-                      {/* サブロールレート */}
-                      <Td borderColor={borderColor} isNumeric>
-                        <Text fontWeight="bold" color="gray.600">
-                          {player.subRate}
-                        </Text>
-                      </Td>
-                      <Td borderColor={borderColor}>
-                        <HStack spacing={2} justify="flex-end">
-                          {isEditing ? (
-                            <>
-                              <IconButton
-                                aria-label="Save"
-                                icon={<CheckIcon />}
-                                size="sm"
-                                colorScheme="green"
-                                onClick={() => handleSaveEdit(player.id)}
-                              />
-                              <IconButton
-                                aria-label="Cancel"
-                                icon={<CloseIcon />}
-                                size="sm"
-                                colorScheme="red"
-                                onClick={handleCancelEdit}
-                              />
-                            </>
-                          ) : isEditingTags ? (
-                            <>
-                              <IconButton
-                                aria-label="Save tags"
-                                icon={<CheckIcon />}
-                                size="sm"
-                                colorScheme="green"
-                                onClick={() => handleSaveTags(player.id)}
-                              />
-                              <IconButton
-                                aria-label="Cancel tags"
-                                icon={<CloseIcon />}
-                                size="sm"
-                                colorScheme="red"
-                                onClick={handleCancelTags}
-                              />
-                            </>
-                          ) : isEditingUnwantedRoles ? (
-                            <>
-                              <IconButton
-                                aria-label="Save unwanted roles"
-                                icon={<CheckIcon />}
-                                size="sm"
-                                colorScheme="green"
-                                onClick={() => handleSaveUnwantedRoles(player.id)}
-                              />
-                              <IconButton
-                                aria-label="Cancel unwanted roles"
-                                icon={<CloseIcon />}
-                                size="sm"
-                                colorScheme="red"
-                                onClick={handleCancelUnwantedRoles}
-                              />
-                            </>
-                          ) : (
-                            <>
-                              <Button
-                                size="sm"
-                                colorScheme="purple"
-                                onClick={() => handleViewHistoryClick(player)}
-                                leftIcon={<TimeIcon />}
-                                variant="outline"
-                              >
-                                履歴
-                              </Button>
-                              <Button
-                                size="sm"
-                                colorScheme="blue"
-                                onClick={() => handleEditPlayerClick(player)}
-                                leftIcon={<EditIcon />}
-                              >
-                                編集
-                              </Button>
-                              <IconButton
-                                aria-label="Delete player"
-                                icon={<DeleteIcon />}
-                                size="sm"
-                                colorScheme="red"
-                                variant="outline"
-                                onClick={() => handleDeletePlayer(player.id, player.name)}
-                              />
-                            </>
-                          )}
-                        </HStack>
-                      </Td>
-                    </Tr>
-                  )
-                })}
-              </Tbody>
-            </Table>
-          </Box>
-        </Card>
-
-        <Text fontSize="sm" color="gray.600" textAlign="center">
-          ※プレイヤーの削除が必要な場合は、Discordで「こにー」までご連絡ください。
-        </Text>
-
-        {/* レート編集モーダル */}
-        <Modal isOpen={isRateModalOpen} onClose={handleCancelRatesModal} size="xl">
-          <ModalOverlay />
-          <ModalContent>
-            <ModalHeader>
-              {rateModalPlayer?.name} のレート編集
-            </ModalHeader>
-            <ModalCloseButton />
-            <ModalBody>
-              <VStack spacing={6} align="stretch">
-                {/* 現在のレート表示 */}
-                <Box p={4} bg="gray.50" borderRadius="md">
-                  <Text fontSize="sm" fontWeight="bold" mb={2}>現在のレート</Text>
-                  <HStack spacing={4}>
-                    <Text>メインロール: <Text as="span" fontWeight="bold" color="blue.600">{rateModalPlayer?.mainRate}</Text></Text>
-                    <Text>サブロール: <Text as="span" fontWeight="bold" color="gray.600">{rateModalPlayer?.subRate}</Text></Text>
-                  </HStack>
-                </Box>
-
-                {/* レート入力フォーム */}
-                <SimpleGrid columns={2} spacing={4}>
-                  <FormControl>
-                    <FormLabel>メインロールレート</FormLabel>
-                    <NumberInput
-                      value={tempMainRate}
-                      onChange={(_, value) => setTempMainRate(value)}
-                      min={0}
-                      max={5000}
-                    >
-                      <NumberInputField />
-                      <NumberInputStepper>
-                        <NumberIncrementStepper />
-                        <NumberDecrementStepper />
-                      </NumberInputStepper>
-                    </NumberInput>
-                  </FormControl>
-                  <FormControl>
-                    <FormLabel>サブロールレート</FormLabel>
-                    <NumberInput
-                      value={tempSubRate}
-                      onChange={(_, value) => setTempSubRate(value)}
-                      min={0}
-                      max={5000}
-                    >
-                      <NumberInputField />
-                      <NumberInputStepper>
-                        <NumberIncrementStepper />
-                        <NumberDecrementStepper />
-                      </NumberInputStepper>
-                    </NumberInput>
-                  </FormControl>
-                </SimpleGrid>
-
-                {/* ランク参考表 */}
-                <Box p={4} bg="blue.50" borderRadius="md">
-                  <Text fontSize="sm" fontWeight="bold" mb={3}>ランク参考表</Text>
-                  <SimpleGrid columns={2} spacing={2}>
-                    {Object.entries(RANK_RATES).map(([rank, rates]) => (
-                      <Box key={rank} p={2} bg="white" borderRadius="sm" border="1px solid" borderColor="gray.200">
-                        <Text fontSize="xs" fontWeight="bold" color="blue.600">{rank}</Text>
-                        <Text fontSize="xs">メイン: {rates.main} | サブ: {rates.sub}</Text>
-                      </Box>
-                    ))}
-                  </SimpleGrid>
-                </Box>
-              </VStack>
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="ghost" mr={3} onClick={handleCancelRatesModal}>
-                キャンセル
-              </Button>
-              <Button colorScheme="blue" onClick={handleSaveRatesModal}>
-                保存
-              </Button>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
-
-        {/* 統合編集モーダル */}
-        <Modal isOpen={isEditModalOpen} onClose={handleCancelEditModal} size="2xl">
-          <ModalOverlay />
-          <ModalContent>
-            <ModalHeader>
-              {editModalPlayer?.name} の編集
-            </ModalHeader>
-            <ModalCloseButton />
-            <ModalBody>
-              <VStack spacing={6} align="stretch">
-                {/* 名前編集 */}
-                <FormControl>
-                  <FormLabel>サモナーネーム</FormLabel>
-                  <Input
-                    value={tempEditName}
-                    onChange={(e) => setTempEditName(e.target.value)}
-                    placeholder="サモナーネームを入力"
-                  />
-                </FormControl>
-
-                {/* ニックネーム編集 */}
-                <FormControl>
-                  <FormLabel>ニックネーム（Discord表示名）</FormLabel>
-                  <Input
-                    value={tempEditNickname}
-                    onChange={(e) => setTempEditNickname(e.target.value)}
-                    placeholder="ニックネームを入力（任意）"
-                  />
-                  <Text fontSize="sm" color="gray.600" mt={1}>
-                    プレイヤー一覧で優先的に表示されます
-                  </Text>
-                </FormControl>
-
-                {/* レート編集 */}
-                <Box>
-                  <HStack justify="space-between" align="center" mb={3}>
-                    <Text fontSize="lg" fontWeight="bold">レート設定</Text>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      colorScheme="blue"
-                      onClick={() => setShowRankReference(!showRankReference)}
-                    >
-                      {showRankReference ? 'ランク参考を閉じる' : 'ランク参考'}
-                    </Button>
-                  </HStack>
-                  
-                  {showRankReference && (
-                    <Box p={4} bg="blue.50" borderRadius="md" mb={4}>
-                      <Text fontSize="sm" fontWeight="bold" mb={3}>ランク参考表</Text>
-                      <SimpleGrid columns={2} spacing={2}>
-                        {Object.entries(RANK_RATES).map(([rank, rates]) => (
-                          <Box key={rank} p={2} bg="white" borderRadius="sm" border="1px solid" borderColor="gray.200">
-                            <Text fontSize="xs" fontWeight="bold" color="blue.600">{rank}</Text>
-                            <Text fontSize="xs">メイン: {rates.main} | サブ: {rates.sub}</Text>
-                          </Box>
-                        ))}
-                      </SimpleGrid>
-                    </Box>
-                  )}
-                  
-                  <SimpleGrid columns={2} spacing={4}>
-                    <FormControl>
-                      <FormLabel>メインロールレート</FormLabel>
-                      <NumberInput
-                        value={tempEditMainRate}
-                        onChange={(_, value) => setTempEditMainRate(value)}
-                        min={0}
-                        max={5000}
-                      >
-                        <NumberInputField />
-                        <NumberInputStepper>
-                          <NumberIncrementStepper />
-                          <NumberDecrementStepper />
-                        </NumberInputStepper>
-                      </NumberInput>
-                    </FormControl>
-                    <FormControl>
-                      <FormLabel>サブロールレート</FormLabel>
-                      <NumberInput
-                        value={tempEditSubRate}
-                        onChange={(_, value) => setTempEditSubRate(value)}
-                        min={0}
-                        max={5000}
-                      >
-                        <NumberInputField />
-                        <NumberInputStepper>
-                          <NumberIncrementStepper />
-                          <NumberDecrementStepper />
-                        </NumberInputStepper>
-                      </NumberInput>
-                    </FormControl>
-                  </SimpleGrid>
-                </Box>
-
-                {/* タグ編集 */}
-                <Box>
-                  <Text fontSize="lg" fontWeight="bold" mb={3}>タグ設定</Text>
-                  <VStack spacing={3} align="stretch">
-                    <Wrap spacing={2}>
-                      {AVAILABLE_TAGS.map((tag) => (
-                        <WrapItem key={tag}>
-                          <Checkbox
-                            isChecked={tempEditTags.includes(tag)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setTempEditTags([...tempEditTags, tag])
-                              } else {
-                                setTempEditTags(tempEditTags.filter(t => t !== tag))
-                              }
-                            }}
-                            colorScheme="blue"
-                          >
-                            <Tag
-                              size="md"
-                              variant={tempEditTags.includes(tag) ? "solid" : "outline"}
-                              colorScheme="blue"
-                            >
-                              <TagLabel>{tag}</TagLabel>
-                            </Tag>
-                          </Checkbox>
-                        </WrapItem>
-                      ))}
-                    </Wrap>
-                  </VStack>
-                </Box>
-
-                {/* 絶対にやりたくないロール編集 */}
-                <Box>
-                  <Text fontSize="lg" fontWeight="bold" mb={3}>絶対にやりたくないロール</Text>
-                  <VStack spacing={3} align="stretch">
-                    <Wrap spacing={2}>
-                      {Object.values(GameRole).map((role) => (
-                        <WrapItem key={role}>
-                          <Checkbox
-                            isChecked={tempEditUnwantedRoles.includes(role)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setTempEditUnwantedRoles([...tempEditUnwantedRoles, role])
-                              } else {
-                                setTempEditUnwantedRoles(tempEditUnwantedRoles.filter(r => r !== role))
-                              }
-                            }}
-                            colorScheme="red"
-                          >
-                            <Tag
-                              size="md"
-                              variant={tempEditUnwantedRoles.includes(role) ? "solid" : "outline"}
-                              colorScheme="red"
-                            >
-                              <TagLabel>{role}</TagLabel>
-                            </Tag>
-                          </Checkbox>
-                        </WrapItem>
-                      ))}
-                    </Wrap>
-                  </VStack>
-                </Box>
-              </VStack>
-            </ModalBody>
-            <ModalFooter>
-              <Button variant="ghost" mr={3} onClick={handleCancelEditModal}>
-                キャンセル
-              </Button>
-              <Button colorScheme="blue" onClick={handleSaveEditModal}>
-                保存
-              </Button>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
-
-        {/* 履歴表示モーダル */}
-        <Modal isOpen={isHistoryModalOpen} onClose={handleCloseHistoryModal} size="4xl" scrollBehavior="inside">
-          <ModalOverlay />
-          <ModalContent maxW="90vw" maxH="90vh">
-            <ModalHeader>
-              {historyModalPlayer?.nickname || historyModalPlayer?.name} の試合履歴
-            </ModalHeader>
-            <ModalCloseButton />
-            <ModalBody>
-              <VStack spacing={4} align="stretch">
-                {/* 統計情報 */}
-                <ChakraCard>
-                  <CardBody>
-                    <SimpleGrid columns={{ base: 2, md: 4 }} spacing={4}>
-                      <Box textAlign="center">
-                        <Text fontSize="sm" color="gray.600">総試合数</Text>
-                        <Text fontSize="2xl" fontWeight="bold">
-                          {playerMatches.length}
-                        </Text>
-                      </Box>
-                      <Box textAlign="center">
-                        <Text fontSize="sm" color="gray.600">勝利数</Text>
-                        <Text fontSize="2xl" fontWeight="bold" color="green.500">
-                          {playerMatches.filter(m => m.isWinner).length}
-                        </Text>
-                      </Box>
-                      <Box textAlign="center">
-                        <Text fontSize="sm" color="gray.600">敗北数</Text>
-                        <Text fontSize="2xl" fontWeight="bold" color="red.500">
-                          {playerMatches.filter(m => !m.isWinner).length}
-                        </Text>
-                      </Box>
-                      <Box textAlign="center">
-                        <Text fontSize="sm" color="gray.600">勝率</Text>
-                        <Text fontSize="2xl" fontWeight="bold" color={playerMatches.length > 0 && (playerMatches.filter(m => m.isWinner).length / playerMatches.length) >= 0.5 ? 'green.500' : 'red.500'}>
-                          {playerMatches.length > 0
-                            ? Math.round((playerMatches.filter(m => m.isWinner).length / playerMatches.length) * 100)
-                            : 0}%
-                        </Text>
-                      </Box>
-                    </SimpleGrid>
-                  </CardBody>
-                </ChakraCard>
-
-                {/* 試合履歴リスト */}
-                {playerMatches.length === 0 ? (
-                  <Box textAlign="center" py={8}>
-                    <Text color="gray.500">試合履歴がありません</Text>
-                  </Box>
-                ) : (
-                  <Box overflowX="auto">
-                    <Table variant="simple" size="sm">
-                      <Thead>
-                        <Tr>
-                          <Th>日時</Th>
-                          <Th>チーム</Th>
-                          <Th>ロール</Th>
-                          <Th>結果</Th>
-                          <Th>勝者</Th>
-                        </Tr>
-                      </Thead>
-                      <Tbody>
-                        {playerMatches.map((match) => (
-                          <Tr key={match.id}>
-                            <Td>
-                              {new Date(match.date.seconds * 1000).toLocaleString('ja-JP')}
-                            </Td>
-                            <Td>
-                              <Badge
-                                colorScheme={match.playerTeam === 'BLUE' ? 'blue' : 'red'}
-                                fontSize="sm"
-                                px={2}
-                                py={1}
-                                borderRadius="full"
-                              >
-                                {match.playerTeam === 'BLUE' ? 'ブルーチーム' : 'レッドチーム'}
-                              </Badge>
-                            </Td>
-                            <Td>
-                              <Badge
-                                colorScheme={
-                                  match.playerRole === 'TOP' ? 'red' :
-                                  match.playerRole === 'JUNGLE' ? 'green' :
-                                  match.playerRole === 'MID' ? 'blue' :
-                                  match.playerRole === 'ADC' ? 'purple' : 'orange'
-                                }
-                                fontSize="sm"
-                                px={2}
-                                py={1}
-                                borderRadius="full"
-                              >
-                                {match.playerRole}
-                              </Badge>
-                            </Td>
-                            <Td>
-                              <Badge
-                                colorScheme={match.isWinner ? 'green' : 'red'}
-                                fontSize="sm"
-                                px={2}
-                                py={1}
-                                borderRadius="full"
-                              >
-                                {match.isWinner ? '勝利' : '敗北'}
-                              </Badge>
-                            </Td>
-                            <Td>
-                              <Badge
-                                colorScheme={match.winner === 'BLUE' ? 'blue' : 'red'}
-                                fontSize="sm"
-                                px={2}
-                                py={1}
-                                borderRadius="full"
-                              >
-                                {match.winner === 'BLUE' ? 'ブルーチーム' : 'レッドチーム'}
-                              </Badge>
-                            </Td>
-                          </Tr>
-                        ))}
-                      </Tbody>
-                    </Table>
-                  </Box>
-                )}
-              </VStack>
-            </ModalBody>
-            <ModalFooter>
-              <Button onClick={handleCloseHistoryModal}>閉じる</Button>
-            </ModalFooter>
-          </ModalContent>
-        </Modal>
-      </VStack>
-    </Layout>
+      <style>{`
+        .page { max-width: 1440px; margin: 0 auto; padding: 28px; }
+        .head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .title { font-family: 'Space Grotesk'; font-size: 22px; font-weight: 600; }
+        .title span { font-family: 'JetBrains Mono'; font-size: 12px; color: var(--fg-3); margin-left: 8px; }
+        .btnAdd { background: var(--fg-0); color: var(--bg-0); border-radius: 9px; padding: 10px 20px; text-decoration: none; }
+        .filters { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+        .filters input, .filters select { background: var(--bg-1); border: 1px solid var(--line); border-radius: 9px; padding: 9px 12px; color: var(--fg-0); }
+        .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+        .chips button, .chips span { font-family: 'JetBrains Mono'; font-size: 10px; border-radius: 999px; border: 1px solid var(--line); padding: 5px 10px; background: transparent; color: var(--fg-2); }
+        .chips button.active { background: color-mix(in oklch, var(--blue) 18%, transparent); border-color: var(--blue-d); color: var(--blue); }
+        .chips .ng { border-radius: 4px; border-color: var(--red-d); color: var(--red); background: color-mix(in oklch, var(--red) 14%, transparent); }
+        .table { border: 1px solid var(--line); border-radius: 14px; overflow: auto; background: var(--bg-1); }
+        .row { display: grid; grid-template-columns: 220px 72px 140px 140px 90px 120px 90px 100px; gap: 0; padding: 0 14px; align-items: center; border-bottom: 1px solid var(--line); min-width: 980px; }
+        .row > div { padding: 10px 8px; }
+        .row.hd { background: var(--bg-2); font-family: 'JetBrains Mono'; font-size: 10px; color: var(--fg-3); letter-spacing: .12em; }
+        .nm { font-weight: 600; }
+        .sub { font-family: 'JetBrains Mono'; font-size: 11px; color: var(--fg-3); }
+        .num { font-family: 'JetBrains Mono'; font-size: 15px; font-weight: 600; }
+        .mini span { padding: 2px 7px; }
+        .acts { display: flex; gap: 5px; justify-content: flex-end; }
+        .acts button { width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--line); background: transparent; color: var(--fg-2); }
+        .backdrop { position: fixed; inset: 0; z-index: 100; background: color-mix(in oklch, var(--bg-0) 80%, transparent); backdrop-filter: blur(6px); display: grid; place-items: center; }
+        .modal { width: min(560px, 94vw); max-height: 90vh; overflow: auto; background: var(--bg-1); border: 1px solid var(--line-2); border-radius: 16px; padding: 18px 22px; display: grid; gap: 12px; }
+        .modal.wide { width: min(700px, 94vw); }
+        .modal h3 { margin: 0; font-family: 'Space Grotesk'; font-size: 16px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .grid input { background: var(--bg-0); border: 1px solid var(--line); border-radius: 9px; color: var(--fg-0); padding: 10px 12px; }
+        .hist { display: grid; grid-template-columns: 1fr 90px 60px 80px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+      `}</style>
+    </div>
   )
-} 
+}

@@ -12,16 +12,30 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 }
 
-if (!firebaseConfig.apiKey || !firebaseConfig.projectId || !firebaseConfig.appId) {
-  throw new Error('Firebase env is missing. Check NEXT_PUBLIC_FIREBASE_* variables.')
+const hasFirebaseEnv = !!(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId)
+const effectiveConfig = hasFirebaseEnv
+  ? firebaseConfig
+  : {
+      apiKey: 'local-dev-placeholder',
+      authDomain: 'local-dev-placeholder.firebaseapp.com',
+      projectId: 'local-dev-placeholder',
+      storageBucket: 'local-dev-placeholder.appspot.com',
+      messagingSenderId: '000000000000',
+      appId: '1:000000000000:web:localdevplaceholder',
+      measurementId: undefined,
+    }
+
+if (!hasFirebaseEnv && typeof window !== 'undefined') {
+  // Keep UI accessible in local design mode.
+  console.warn('Firebase env is missing. Running in local placeholder mode.')
 }
 
-const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
+const app = getApps().length ? getApp() : initializeApp(effectiveConfig)
 export const db = getFirestore(app)
 
 // クライアントサイドかつサポート環境でのみAnalyticsを初期化
 export let analytics: ReturnType<typeof getAnalytics> | null = null
-if (typeof window !== 'undefined') {
+if (hasFirebaseEnv && typeof window !== 'undefined') {
   isSupported().then((ok) => {
     if (ok) analytics = getAnalytics(app)
   })

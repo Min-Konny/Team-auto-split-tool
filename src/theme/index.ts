@@ -4,57 +4,45 @@ const theme = extendTheme({
   styles: {
     global: {
       body: {
-        bg: 'gray.50',
+        bg: 'var(--bg-0)',
+        color: 'var(--fg-0)',
+        fontFamily: 'Inter, system-ui, sans-serif',
       },
     },
   },
   components: {
-    Card: {
-      baseStyle: {
-        container: {
-          borderRadius: 'lg',
-          boxShadow: 'base',
-          p: 4,
-          bg: 'white',
-          transition: 'all 0.2s',
-        },
-      },
-      variants: {
-        hoverable: {
-          container: {
-            _hover: {
-              transform: 'translateY(-2px)',
-              boxShadow: 'md',
-            },
-          },
-        },
-      },
-    },
     Button: {
-      defaultProps: {
-        colorScheme: 'blue',
+      baseStyle: {
+        borderRadius: '9px',
       },
       variants: {
         solid: {
-          boxShadow: 'md',
-          _hover: {
-            transform: 'translateY(-1px)',
-            boxShadow: 'lg',
-          },
+          bg: 'var(--fg-0)',
+          color: 'var(--bg-0)',
+          boxShadow: 'none',
+          _hover: { bg: 'var(--gold)' },
+        },
+        outline: {
+          borderColor: 'var(--line-2)',
+          color: 'var(--fg-1)',
+          _hover: { bg: 'var(--bg-2)' },
         },
       },
     },
-  },
-  colors: {
-    roleColors: {
-      TOP: 'red.500',
-      JUNGLE: 'green.500',
-      MID: 'blue.500',
-      ADC: 'purple.500',
-      SUP: 'orange.500',
-      FILL: 'gray.500',
+    Input: {
+      variants: {
+        outline: {
+          field: {
+            bg: 'var(--bg-1)',
+            borderColor: 'var(--line)',
+            color: 'var(--fg-0)',
+            _placeholder: { color: 'var(--fg-3)' },
+            _focus: { borderColor: 'var(--line-2)', boxShadow: 'none' },
+          },
+        },
+      },
     },
   },
 })
 
-export default theme 
+export default theme
