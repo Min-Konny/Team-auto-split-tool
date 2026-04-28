@@ -149,9 +149,18 @@ export default function TeamMakerPage() {
       return
     }
     const next = { blue: [...teams.blue], red: [...teams.red] }
-    const tmp = next[swapSource.team][swapSource.idx]
-    next[swapSource.team][swapSource.idx] = next[team][idx]
-    next[team][idx] = tmp
+    const sourceSlot = next[swapSource.team][swapSource.idx]
+    const targetSlot = next[team][idx]
+    if (!sourceSlot || !targetSlot) {
+      setSwapSource(null)
+      return
+    }
+
+    // Keep role slots fixed and swap only players.
+    // This prevents duplicate/missing roles and keeps role-row mapping stable.
+    next[swapSource.team][swapSource.idx] = { ...sourceSlot, player: targetSlot.player }
+    next[team][idx] = { ...targetSlot, player: sourceSlot.player }
+
     setTeams(next)
     setSwapSource(null)
   }
