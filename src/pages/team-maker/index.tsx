@@ -27,6 +27,7 @@ import {
   Badge,
   IconButton,
   Divider,
+  useColorModeValue,
   Checkbox,
   CheckboxGroup,
   Wrap,
@@ -113,7 +114,7 @@ export default function TeamMaker() {
   const teamsRef = useRef<HTMLDivElement>(null)
   const toast = useToast()
   const { isOpen, onOpen, onClose } = useDisclosure()
-  const memberCardBg = 'var(--bg-2)'
+  const memberCardBg = useColorModeValue('gray.50', 'gray.700')
 
   useEffect(() => {
     const fetchPlayers = async () => {
@@ -695,12 +696,12 @@ export default function TeamMaker() {
                       return (
                         <Card
                           key={player.id}
-                          bg={isSelected ? 'color-mix(in oklch, var(--blue) 16%, transparent)' : 'var(--bg-1)'}
+                          bg={isSelected ? 'blue.50' : 'white'}
                           border="1px solid"
-                          borderColor={isSelected ? 'var(--blue-d)' : 'var(--line)'}
+                          borderColor={isSelected ? 'blue.200' : 'gray.200'}
                           cursor={isSelected ? 'not-allowed' : 'pointer'}
                           onClick={() => !isSelected && handleAddPlayer(player)}
-                          _hover={!isSelected ? { bg: 'var(--bg-2)' } : {}}
+                          _hover={!isSelected ? { bg: 'gray.50' } : {}}
                         >
                           <CardBody p={3}>
                             <VStack spacing={2} align="stretch">
@@ -763,7 +764,7 @@ export default function TeamMaker() {
             <CardBody>
               <VStack spacing={4} align="stretch">
                 {selectedPlayers.map((selectedPlayer, index) => (
-                  <Card key={selectedPlayer.player.id} bg="color-mix(in oklch, var(--blue) 14%, transparent)" borderWidth="1px" borderColor="var(--blue-d)">
+                  <Card key={selectedPlayer.player.id} bg="blue.50">
                     <CardBody p={3}>
                       <VStack spacing={3} align="stretch">
                         <HStack justify="space-between">
@@ -861,14 +862,14 @@ export default function TeamMaker() {
           bottom="0"
           left="0"
           right="0"
-          bg="var(--bg-1)"
+          bg="white"
           borderTop="1px solid"
-          borderColor="var(--line)"
+          borderColor="gray.200"
           p={3}
           zIndex={1000}
           boxShadow="0 -2px 10px rgba(0,0,0,0.1)"
         >
-          <Container maxW="1440px">
+          <Container maxW="container.xl">
             <Flex 
               align="center" 
               gap={3}

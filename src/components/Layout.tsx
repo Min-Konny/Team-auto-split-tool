@@ -1,6 +1,6 @@
-import { Box } from '@chakra-ui/react'
-import Header from '@/components/Header'
-import type { ReactNode } from 'react'
+import { Box, Container } from '@chakra-ui/react'
+import Header from './Header'
+import { ReactNode } from 'react'
 
 interface LayoutProps {
   children: ReactNode
@@ -8,18 +8,25 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   return (
-    <Box minH="100vh" bg="var(--bg-0)" color="var(--fg-0)" fontFamily="body">
+    <Box minH="100vh" bg="gray.50">
       <Header />
-      <Box
-        as="main"
-        maxW="1440px"
-        mx="auto"
-        px={{ base: 4, md: '28px' }}
-        pt={{ base: '20px', md: '28px' }}
-        pb="60px"
+      <Container
+        maxW="container.xl"
+        py={8}
+        px={{ base: 4, md: 8 }}
+        position="relative"
       >
-        {children}
-      </Box>
+        <Box
+          bg="white"
+          borderRadius="xl"
+          boxShadow="lg"
+          p={{ base: 4, md: 6, lg: 8 }}
+          transition="all 0.2s"
+          _hover={{ boxShadow: 'xl' }}
+        >
+          {children}
+        </Box>
+      </Container>
     </Box>
   )
-}
+} 

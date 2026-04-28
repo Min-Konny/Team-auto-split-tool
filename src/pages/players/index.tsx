@@ -17,6 +17,7 @@ import {
   Input,
   InputGroup,
   InputLeftElement,
+  useColorModeValue,
   Text,
   Tag,
   TagLabel,
@@ -54,9 +55,9 @@ import { Player, GameRole, RANK_RATES, Rank, Match } from '@/types'
 import Layout from '@/components/Layout'
 import Card from '@/components/Card'
 import Link from 'next/link'
-import RoleBadge from '@/components/RoleBadge'
-import RankChip from '@/components/RankChip'
-import { AVAILABLE_TAGS } from '@/constants/playerTags'
+
+// 利用可能なタグオプション
+const AVAILABLE_TAGS = ['249', 'SHIFT', 'きらくに']
 
 interface EditingState {
   id: string | null;
@@ -92,6 +93,7 @@ export default function Players() {
   const [tempEditUnwantedRoles, setTempEditUnwantedRoles] = useState<GameRole[]>([])
   const { isOpen: isEditModalOpen, onOpen: onEditModalOpen, onClose: onEditModalClose } = useDisclosure()
   const [showRankReference, setShowRankReference] = useState(false)
+  const borderColor = useColorModeValue('gray.200', 'gray.700')
   const toast = useToast()
 
   // 履歴モーダルの状態
@@ -111,6 +113,17 @@ export default function Players() {
   useEffect(() => {
     fetchPlayers()
   }, [])
+
+  const getRoleColor = (role: GameRole) => {
+    const colors = {
+      TOP: 'red',
+      JUNGLE: 'green',
+      MID: 'blue',
+      ADC: 'purple',
+      SUP: 'orange'
+    }
+    return colors[role]
+  }
 
   const handleEditClick = (player: Player & { id: string }) => {
     setEditing({ 
@@ -535,31 +548,39 @@ export default function Players() {
     return matchesSearch && matchesTags
   })
 
-  const playerGridCols =
-    'minmax(176px,1.25fr) 80px minmax(124px,1fr) minmax(152px,1.1fr) 88px minmax(112px,0.95fr) minmax(112px,0.95fr) minmax(120px,1fr)'
-
   return (
     <Layout>
       <VStack spacing={6} align="stretch">
-        <HStack justify="space-between" align="center" flexWrap="wrap" gap={3}>
-          <Heading size="xl">プレイヤー一覧</Heading>
-          <Button
-            as={Link}
-            href="/players/new"
-            size="md"
-            colorScheme="lolPrimary"
-            leftIcon={<AddIcon />}
-          >
-            新規登録
-          </Button>
+        <HStack justify="space-between" align="center">
+          <Heading color="blue.600" fontSize={{ base: '2xl', md: '3xl' }}>
+            『プレイヤー』一覧
+          </Heading>
+          <HStack spacing={3}>
+            <Link href="/players/new" passHref>
+              <Button
+                as="a"
+                colorScheme="blue"
+                size="md"
+                leftIcon={<AddIcon />}
+                boxShadow="md"
+                _hover={{ 
+                  transform: 'translateY(-2px)',
+                  boxShadow: 'lg'
+                }}
+              >
+                新規登録
+              </Button>
+            </Link>
+          </HStack>
         </HStack>
 
         <Card>
-          <Box p={{ base: 3, md: 4 }}>
+          <Box p={4}>
             <VStack spacing={4} align="stretch">
+              {/* 検索バー */}
               <InputGroup>
                 <InputLeftElement pointerEvents="none">
-                  <SearchIcon color="var(--fg-3)" />
+                  <SearchIcon color="gray.300" />
                 </InputLeftElement>
                 <Input
                   placeholder="プレイヤー名で検索..."
@@ -569,33 +590,28 @@ export default function Players() {
                 />
               </InputGroup>
 
+              {/* タグフィルター */}
               {availableTags.length > 0 && (
                 <Box>
-                  <Text
-                    mb={2}
-                    fontSize="11px"
-                    fontFamily="'JetBrains Mono', monospace"
-                    color="var(--fg-3)"
-                    letterSpacing="0.14em"
-                    textTransform="uppercase"
-                  >
-                    タグフィルター
+                  <Text fontSize="sm" fontWeight="bold" mb={2}>
+                    タグで絞り込み:
                   </Text>
                   <Wrap spacing={2}>
                     {availableTags.map((tag) => (
                       <WrapItem key={tag}>
                         <Tag
                           size="md"
+                          variant={selectedTags.includes(tag) ? "solid" : "outline"}
+                          colorScheme={selectedTags.includes(tag) ? "blue" : "gray"}
                           cursor="pointer"
-                          borderWidth="1px"
-                          borderColor={selectedTags.includes(tag) ? 'var(--blue-d)' : 'var(--line)'}
-                          bg={selectedTags.includes(tag) ? 'color-mix(in oklch, var(--blue) 18%, transparent)' : 'transparent'}
-                          color={selectedTags.includes(tag) ? 'var(--fg-0)' : 'var(--fg-2)'}
                           onClick={() => {
-                            if (selectedTags.includes(tag)) setSelectedTags(selectedTags.filter((t) => t !== tag))
-                            else setSelectedTags([...selectedTags, tag])
+                            if (selectedTags.includes(tag)) {
+                              setSelectedTags(selectedTags.filter(t => t !== tag))
+                            } else {
+                              setSelectedTags([...selectedTags, tag])
+                            }
                           }}
-                          _hover={{ borderColor: 'var(--line-2)' }}
+                          _hover={{ opacity: 0.8 }}
                         >
                           <TagLabel>{tag}</TagLabel>
                         </Tag>
@@ -603,7 +619,13 @@ export default function Players() {
                     ))}
                   </Wrap>
                   {selectedTags.length > 0 && (
-                    <Button size="xs" variant="ghost" mt={2} onClick={() => setSelectedTags([])}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      colorScheme="gray"
+                      onClick={() => setSelectedTags([])}
+                      mt={2}
+                    >
                       フィルターをクリア
                     </Button>
                   )}
@@ -612,358 +634,281 @@ export default function Players() {
             </VStack>
           </Box>
 
-          <Box overflowX="auto" pb={4}>
-            <Box minW="1140px" px={{ base: 2, md: 4 }}>
-              <Box
-                display="grid"
-                gridTemplateColumns={playerGridCols}
-                alignItems="end"
-                gap={2}
-                px={3}
-                pb={3}
-                mb={2}
-                borderBottomWidth="1px"
-                borderBottomColor="var(--line)"
-                fontSize="sm"
-              >
-                <Text
-                  fontSize="10px"
-                  fontFamily="'JetBrains Mono', monospace"
-                  letterSpacing="0.12em"
-                  textTransform="uppercase"
-                  color="var(--fg-3)"
-                  fontWeight={600}
-                >
-                  PLAYER
-                </Text>
-                <Text
-                  textAlign="center"
-                  fontSize="10px"
-                  fontFamily="'JetBrains Mono', monospace"
-                  letterSpacing="0.12em"
-                  textTransform="uppercase"
-                  color="var(--fg-3)"
-                  fontWeight={600}
-                >
-                  ROLE
-                </Text>
-                <Text
-                  fontSize="10px"
-                  fontFamily="'JetBrains Mono', monospace"
-                  letterSpacing="0.12em"
-                  textTransform="uppercase"
-                  color="var(--fg-3)"
-                  fontWeight={600}
-                >
-                  TAGS
-                </Text>
-                <Text
-                  fontSize="10px"
-                  fontFamily="'JetBrains Mono', monospace"
-                  letterSpacing="0.12em"
-                  textTransform="uppercase"
-                  color="var(--fg-3)"
-                  fontWeight={600}
-                >
-                  NG
-                </Text>
-                <Text textAlign="right" fontSize="10px" fontFamily="'JetBrains Mono', monospace" letterSpacing="0.12em" textTransform="uppercase" color="var(--fg-3)" fontWeight={600}>
-                  WR%
-                </Text>
-                <Text textAlign="right" fontSize="10px" fontFamily="'JetBrains Mono', monospace" letterSpacing="0.12em" textTransform="uppercase" color="var(--fg-3)" fontWeight={600}>
-                  MAIN
-                </Text>
-                <Text textAlign="right" fontSize="10px" fontFamily="'JetBrains Mono', monospace" letterSpacing="0.12em" textTransform="uppercase" color="var(--fg-3)" fontWeight={600}>
-                  SUB
-                </Text>
-                <Box aria-hidden />
-              </Box>
-
-              <VStack spacing={0} align="stretch" w="full">
+          <Box overflowX="auto">
+            <Table variant="simple" size="sm" minW="1200px">
+              <Thead bg="gray.50">
+                <Tr>
+                  <Th borderColor={borderColor}>名前</Th>
+                  <Th borderColor={borderColor}>メインロール</Th>
+                  <Th borderColor={borderColor}>タグ</Th>
+                  <Th borderColor={borderColor}>絶対にやりたくないロール</Th>
+                  <Th borderColor={borderColor} isNumeric>勝率</Th>
+                  <Th borderColor={borderColor} isNumeric>メインロールレート</Th>
+                  <Th borderColor={borderColor} isNumeric>サブロールレート</Th>
+                  <Th borderColor={borderColor} width="120px"></Th>
+                </Tr>
+              </Thead>
+              <Tbody>
                 {filteredPlayers.map((player) => {
-                  const winRate =
-                    player.stats.wins + player.stats.losses > 0
-                      ? Math.round((player.stats.wins / (player.stats.wins + player.stats.losses)) * 100)
-                      : 0
+                  const winRate = player.stats.wins + player.stats.losses > 0
+                    ? Math.round((player.stats.wins / (player.stats.wins + player.stats.losses)) * 100)
+                    : 0
 
                   const isEditing = editing?.id === player.id
                   const isEditingTags = editingTags?.id === player.id
                   const isEditingUnwantedRoles = editingUnwantedRoles?.id === player.id
 
                   return (
-                    <Box
+                    <Tr 
                       key={player.id}
-                      display="grid"
-                      gridTemplateColumns={playerGridCols}
-                      alignItems="center"
-                      gap={2}
-                      px={3}
-                      py={3}
-                      borderBottomWidth="1px"
-                      borderBottomColor="var(--line)"
-                      fontSize="sm"
-                      _hover={{ bg: 'var(--bg-2)' }}
+                      _hover={{ bg: 'gray.50' }}
+                      transition="background-color 0.2s"
                     >
-                            <Flex
-                              align="center"
-                              px={0}
-                              py={0}
-                              minW={0}
-                            >
-                              {isEditing ? (
-                                <Input
-                                  value={editing.newName}
-                                  onChange={(e) =>
-                                    setEditing({ ...editing, newName: e.target.value })
-                                  }
+                      <Td borderColor={borderColor}>
+                        {isEditing ? (
+                          <Input
+                            value={editing.newName}
+                            onChange={(e) => setEditing({ ...editing, newName: e.target.value })}
+                            size="sm"
+                            width="200px"
+                          />
+                        ) : (
+                          player.nickname || player.name
+                        )}
+                      </Td>
+                      <Td borderColor={borderColor}>
+                        <Badge 
+                          colorScheme={getRoleColor(player.mainRole)}
+                          fontSize="sm"
+                          px={2}
+                          py={1}
+                          borderRadius="full"
+                        >
+                          {player.mainRole}
+                        </Badge>
+                      </Td>
+                      <Td borderColor={borderColor}>
+                        {isEditingTags ? (
+                          <VStack spacing={2} align="stretch">
+                            <Wrap spacing={2}>
+                              {AVAILABLE_TAGS.map((tag) => (
+                                <WrapItem key={tag}>
+                                  <Checkbox
+                                    isChecked={editingTags.tags.includes(tag)}
+                                    onChange={() => {
+                                      if (editingTags.tags.includes(tag)) {
+                                        removeTag(player.id, tag)
+                                      } else {
+                                        setEditingTags({
+                                          ...editingTags,
+                                          tags: [...editingTags.tags, tag]
+                                        })
+                                      }
+                                    }}
+                                    colorScheme="blue"
+                                    size="sm"
+                                  >
+                                    <Tag
+                                      size="sm"
+                                      variant={editingTags.tags.includes(tag) ? "solid" : "outline"}
+                                      colorScheme="blue"
+                                    >
+                                      <TagLabel>{tag}</TagLabel>
+                                    </Tag>
+                                  </Checkbox>
+                                </WrapItem>
+                              ))}
+                            </Wrap>
+                          </VStack>
+                        ) : (
+                          <Wrap spacing={1}>
+                            {player.tags?.map((tag, index) => (
+                              <WrapItem key={index}>
+                                <Tag
                                   size="sm"
-                                  maxW="220px"
-                                />
-                              ) : (
-                                <Text fontWeight={600}>{player.nickname || player.name}</Text>
-                              )}
-                            </Flex>
-
-                            <Flex justify="center" px={0}>
-                              <RoleBadge role={player.mainRole} />
-                            </Flex>
-
-                            <Flex direction="column" gap={2} px={0} minW={0}>
-                              {isEditingTags && editingTags ? (
-                                <Wrap spacing={2}>
-                                  {AVAILABLE_TAGS.map((tag) => (
-                                    <WrapItem key={tag}>
-                                      <Checkbox
-                                        isChecked={editingTags.tags.includes(tag)}
-                                        onChange={() => {
-                                          if (editingTags.tags.includes(tag))
-                                            removeTag(player.id, tag)
-                                          else
-                                            setEditingTags({
-                                              ...editingTags,
-                                              tags: [...editingTags.tags, tag],
-                                            })
-                                        }}
-                                        size="sm"
-                                      >
-                                        <Tag
-                                          size="sm"
-                                          borderWidth="1px"
-                                          borderColor="var(--line)"
-                                          variant={
-                                            editingTags.tags.includes(tag) ? 'solid' : 'outline'
-                                          }
-                                        >
-                                          <TagLabel>{tag}</TagLabel>
-                                        </Tag>
-                                      </Checkbox>
-                                    </WrapItem>
-                                  ))}
-                                </Wrap>
-                              ) : (
-                                <Wrap spacing={1}>
-                                  {player.tags?.map((tag, index) => (
-                                    <WrapItem key={index}>
-                                      <Tag
-                                        size="sm"
-                                        cursor="pointer"
-                                        variant="outline"
-                                        borderColor="var(--line)"
-                                        onClick={() => {
-                                          if (!selectedTags.includes(tag))
-                                            setSelectedTags([...selectedTags, tag])
-                                        }}
-                                      >
-                                        <TagLabel>{tag}</TagLabel>
-                                      </Tag>
-                                    </WrapItem>
-                                  )) || (
-                                    <Text fontSize="sm" color="var(--fg-3)">
-                                      タグなし
-                                    </Text>
-                                  )}
-                                </Wrap>
-                              )}
-                            </Flex>
-
-                            <Flex direction="column" gap={2} px={0} minW={0}>
-                              {isEditingUnwantedRoles && editingUnwantedRoles ? (
-                                <Wrap spacing={2}>
-                                  {Object.values(GameRole).map((role) => (
-                                    <WrapItem key={role}>
-                                      <Checkbox
-                                        isChecked={editingUnwantedRoles.unwantedRoles.includes(role)}
-                                        onChange={() => handleUnwantedRoleToggle(role)}
-                                        size="sm"
-                                      >
-                                        <Tag size="sm" variant="outline" borderColor="var(--red-d)">
-                                          <TagLabel>{role}</TagLabel>
-                                        </Tag>
-                                      </Checkbox>
-                                    </WrapItem>
-                                  ))}
-                                </Wrap>
-                              ) : (
-                                <Wrap spacing={1}>
-                                  {player.unwantedRoles?.map((role, index) => (
-                                    <WrapItem key={index}>
-                                      <Tag size="sm" variant="outline" borderColor="var(--line)">
-                                        <TagLabel>{role}</TagLabel>
-                                      </Tag>
-                                    </WrapItem>
-                                  )) || (
-                                    <Text fontSize="sm" color="var(--fg-3)">
-                                      なし
-                                    </Text>
-                                  )}
-                                </Wrap>
-                              )}
-                            </Flex>
-
-                            <VStack align="flex-end" spacing={2} px={0}>
-                              <Text
-                                fontFamily="'JetBrains Mono', monospace"
-                                fontWeight={700}
-                                fontSize="lg"
-                                color={winRate >= 50 ? 'var(--ok)' : 'var(--red)'}
+                                  variant="outline"
+                                  colorScheme="blue"
+                                  cursor="pointer"
+                                  onClick={() => {
+                                    if (!selectedTags.includes(tag)) {
+                                      setSelectedTags([...selectedTags, tag])
+                                    }
+                                  }}
+                                  _hover={{ opacity: 0.8 }}
+                                >
+                                  <TagLabel>{tag}</TagLabel>
+                                </Tag>
+                              </WrapItem>
+                            )) || (
+                              <Text fontSize="sm" color="gray.400">
+                                タグなし
+                              </Text>
+                            )}
+                          </Wrap>
+                        )}
+                      </Td>
+                      <Td borderColor={borderColor}>
+                        {isEditingUnwantedRoles ? (
+                          <VStack spacing={2} align="stretch">
+                            <Wrap spacing={2}>
+                              {Object.values(GameRole).map((role) => (
+                                <WrapItem key={role}>
+                                  <Checkbox
+                                    isChecked={editingUnwantedRoles.unwantedRoles.includes(role)}
+                                    onChange={() => handleUnwantedRoleToggle(role)}
+                                    colorScheme="red"
+                                    size="sm"
+                                  >
+                                    <Tag
+                                      size="sm"
+                                      variant={editingUnwantedRoles.unwantedRoles.includes(role) ? "solid" : "outline"}
+                                      colorScheme="red"
+                                    >
+                                      <TagLabel>{role}</TagLabel>
+                                    </Tag>
+                                  </Checkbox>
+                                </WrapItem>
+                              ))}
+                            </Wrap>
+                          </VStack>
+                        ) : (
+                          <Wrap spacing={1}>
+                            {player.unwantedRoles?.map((role, index) => (
+                              <WrapItem key={index}>
+                                <Tag
+                                  size="sm"
+                                  variant="outline"
+                                  colorScheme="red"
+                                >
+                                  <TagLabel>{role}</TagLabel>
+                                </Tag>
+                              </WrapItem>
+                            )) || (
+                              <Text fontSize="sm" color="gray.400">
+                                なし
+                              </Text>
+                            )}
+                          </Wrap>
+                        )}
+                      </Td>
+                      <Td borderColor={borderColor} isNumeric>
+                        <Text 
+                          color={winRate >= 50 ? 'green.500' : 'red.500'}
+                          fontWeight="bold"
+                        >
+                          {winRate}%
+                        </Text>
+                        <Text fontSize="xs" color="gray.500">
+                          ({player.stats.wins}勝{player.stats.losses}敗)
+                        </Text>
+                      </Td>
+                      {/* メインロールレート */}
+                      <Td borderColor={borderColor} isNumeric>
+                        <Text fontWeight="bold" color="blue.600">
+                          {player.mainRate}
+                        </Text>
+                      </Td>
+                      {/* サブロールレート */}
+                      <Td borderColor={borderColor} isNumeric>
+                        <Text fontWeight="bold" color="gray.600">
+                          {player.subRate}
+                        </Text>
+                      </Td>
+                      <Td borderColor={borderColor}>
+                        <HStack spacing={2} justify="flex-end">
+                          {isEditing ? (
+                            <>
+                              <IconButton
+                                aria-label="Save"
+                                icon={<CheckIcon />}
+                                size="sm"
+                                colorScheme="green"
+                                onClick={() => handleSaveEdit(player.id)}
+                              />
+                              <IconButton
+                                aria-label="Cancel"
+                                icon={<CloseIcon />}
+                                size="sm"
+                                colorScheme="red"
+                                onClick={handleCancelEdit}
+                              />
+                            </>
+                          ) : isEditingTags ? (
+                            <>
+                              <IconButton
+                                aria-label="Save tags"
+                                icon={<CheckIcon />}
+                                size="sm"
+                                colorScheme="green"
+                                onClick={() => handleSaveTags(player.id)}
+                              />
+                              <IconButton
+                                aria-label="Cancel tags"
+                                icon={<CloseIcon />}
+                                size="sm"
+                                colorScheme="red"
+                                onClick={handleCancelTags}
+                              />
+                            </>
+                          ) : isEditingUnwantedRoles ? (
+                            <>
+                              <IconButton
+                                aria-label="Save unwanted roles"
+                                icon={<CheckIcon />}
+                                size="sm"
+                                colorScheme="green"
+                                onClick={() => handleSaveUnwantedRoles(player.id)}
+                              />
+                              <IconButton
+                                aria-label="Cancel unwanted roles"
+                                icon={<CloseIcon />}
+                                size="sm"
+                                colorScheme="red"
+                                onClick={handleCancelUnwantedRoles}
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <Button
+                                size="sm"
+                                colorScheme="purple"
+                                onClick={() => handleViewHistoryClick(player)}
+                                leftIcon={<TimeIcon />}
+                                variant="outline"
                               >
-                                {winRate}%
-                              </Text>
-                              <Box maxW="80px" w="full" h="3px" bg="var(--bg-3)" borderRadius="full" overflow="hidden">
-                                <Box h="full" w={`${Math.min(winRate, 100)}%`} bg={winRate >= 50 ? 'var(--ok)' : 'var(--red)'} />
-                              </Box>
-                              <Text fontSize="10px" color="var(--fg-3)" whiteSpace="nowrap">
-                                ({player.stats.wins}勝{player.stats.losses}敗)
-                              </Text>
-                            </VStack>
-
-                            <VStack align="flex-end" spacing={2} px={0}>
-                              <Text
-                                fontFamily="'JetBrains Mono', monospace"
-                                fontWeight={600}
-                                fontSize="lg"
-                                color="var(--blue)"
+                                履歴
+                              </Button>
+                              <Button
+                                size="sm"
+                                colorScheme="blue"
+                                onClick={() => handleEditPlayerClick(player)}
+                                leftIcon={<EditIcon />}
                               >
-                                {player.mainRate}
-                              </Text>
-                              <RankChip rate={player.mainRate} />
-                            </VStack>
-
-                            <VStack align="flex-end" spacing={2} px={0}>
-                              <Text
-                                fontFamily="'JetBrains Mono', monospace"
-                                fontWeight={600}
-                                fontSize="lg"
-                                color="var(--fg-1)"
-                              >
-                                {player.subRate}
-                              </Text>
-                              <RankChip rate={player.subRate} />
-                            </VStack>
-
-                            <HStack spacing={1} justify="flex-end" flexWrap="wrap" px={2} py={2} gridColumn={{ base: '1', md: '8' }}>
-                              {isEditing ? (
-                                <>
-                                  <IconButton
-                                    aria-label="Save"
-                                    icon={<CheckIcon />}
-                                    variant="outline"
-                                    size="sm"
-                                    borderColor="var(--line)"
-                                    onClick={() => handleSaveEdit(player.id)}
-                                  />
-                                  <IconButton
-                                    aria-label="Cancel"
-                                    icon={<CloseIcon />}
-                                    variant="outline"
-                                    size="sm"
-                                    borderColor="var(--line)"
-                                    onClick={handleCancelEdit}
-                                  />
-                                </>
-                              ) : isEditingTags ? (
-                                <>
-                                  <IconButton
-                                    aria-label="Save tags"
-                                    icon={<CheckIcon />}
-                                    variant="outline"
-                                    size="sm"
-                                    borderColor="var(--line)"
-                                    onClick={() => handleSaveTags(player.id)}
-                                  />
-                                  <IconButton
-                                    aria-label="Cancel tags"
-                                    icon={<CloseIcon />}
-                                    variant="outline"
-                                    size="sm"
-                                    borderColor="var(--line)"
-                                    onClick={handleCancelTags}
-                                  />
-                                </>
-                              ) : isEditingUnwantedRoles ? (
-                                <>
-                                  <IconButton
-                                    aria-label="Save unwanted roles"
-                                    icon={<CheckIcon />}
-                                    variant="outline"
-                                    size="sm"
-                                    borderColor="var(--line)"
-                                    onClick={() => handleSaveUnwantedRoles(player.id)}
-                                  />
-                                  <IconButton
-                                    aria-label="Cancel unwanted roles"
-                                    icon={<CloseIcon />}
-                                    variant="outline"
-                                    size="sm"
-                                    borderColor="var(--line)"
-                                    onClick={handleCancelUnwantedRoles}
-                                  />
-                                </>
-                              ) : (
-                                <>
-                                  <IconButton
-                                    aria-label="履歴"
-                                    icon={<TimeIcon />}
-                                    variant="outline"
-                                    size="sm"
-                                    borderColor="var(--line)"
-                                    onClick={() => handleViewHistoryClick(player)}
-                                  />
-                                  <IconButton
-                                    aria-label="編集"
-                                    icon={<EditIcon />}
-                                    variant="solid"
-                                    size="sm"
-                                    colorScheme="lolPrimary"
-                                    onClick={() => handleEditPlayerClick(player)}
-                                  />
-                                  <IconButton
-                                    aria-label="Delete player"
-                                    icon={<DeleteIcon />}
-                                    variant="outline"
-                                    size="sm"
-                                    borderColor="var(--red-d)"
-                                    onClick={() => handleDeletePlayer(player.id, player.name)}
-                                  />
-                                </>
-                              )}
-                            </HStack>
-                    </Box>
+                                編集
+                              </Button>
+                              <IconButton
+                                aria-label="Delete player"
+                                icon={<DeleteIcon />}
+                                size="sm"
+                                colorScheme="red"
+                                variant="outline"
+                                onClick={() => handleDeletePlayer(player.id, player.name)}
+                              />
+                            </>
+                          )}
+                        </HStack>
+                      </Td>
+                    </Tr>
                   )
                 })}
-              </VStack>
-            </Box>
+              </Tbody>
+            </Table>
           </Box>
         </Card>
 
-        <VStack spacing={1}>
-          <Text fontSize="sm" color="var(--fg-2)" textAlign="center">
-            ※プレイヤーの削除が必要な場合は、Discordで「こにー」までご連絡ください。
-          </Text>
-          <Text fontSize="sm" color="var(--fg-2)" textAlign="center">
-            ※タグ作成依頼は discord:konny0329s までお願いします。
-          </Text>
-        </VStack>
+        <Text fontSize="sm" color="gray.600" textAlign="center">
+          ※プレイヤーの削除が必要な場合は、Discordで「こにー」までご連絡ください。
+        </Text>
 
         {/* レート編集モーダル */}
         <Modal isOpen={isRateModalOpen} onClose={handleCancelRatesModal} size="xl">

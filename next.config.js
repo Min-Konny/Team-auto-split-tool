@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false,
   },
   webpack: (config) => {
     config.resolve.alias = {
