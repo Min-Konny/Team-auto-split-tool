@@ -49,6 +49,7 @@ export default function Header() {
         </CLink>
 
         <HStack spacing={1}>
+          <CLink as={Link} href="/community" sx={navItem}>{'\u30b3\u30df\u30e5'}</CLink>
           <CLink as={Link} href="/players" sx={navItem}>{'\u30d7\u30ec\u30a4\u30e4\u30fc'}</CLink>
           <CLink as={Link} href="/players/new" sx={navItem}>{'\u767b\u9332'}</CLink>
           <CLink as={Link} href="/matches" sx={navItem}>{'\u8a66\u5408\u5c65\u6b74'}</CLink>

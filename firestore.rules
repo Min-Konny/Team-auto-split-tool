@@ -1,0 +1,56 @@
+rules_version = '2';
+
+// 試合登録・ELO/stats 更新・移行はサーバー（Admin SDK）経由。
+// クライアントはプロフィール（elo/stats 以外）とロビーのみ書き込み可。
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isMember(data) {
+      return data.keys().hasAll(['name', 'elo', 'roles', 'mainRole', 'stats'])
+        && data.name is string
+        && data.elo is number
+        && data.mainRole is string;
+    }
+
+    function memberEloStatsUnchanged() {
+      return request.resource.data.elo == resource.data.elo
+        && request.resource.data.stats == resource.data.stats;
+    }
+
+    match /communities/{communityId} {
+      allow read: if true;
+      allow create: if false;
+      allow update: if true;
+
+      match /members/{memberId} {
+        allow read: if true;
+        allow create: if isMember(request.resource.data);
+        allow update: if isMember(request.resource.data) && memberEloStatsUnchanged();
+        allow delete: if true;
+      }
+
+      match /matches/{matchId} {
+        allow read: if true;
+        allow write: if false;
+      }
+
+      match /lobbies/{lobbyId} {
+        allow read, write: if true;
+      }
+    }
+
+    match /players/{playerId} {
+      allow read: if true;
+      allow write: if false;
+    }
+    match /matches/{matchId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /lobbies/{lobbyId} {
+      allow read, write: if false;
+    }
+  }
+}

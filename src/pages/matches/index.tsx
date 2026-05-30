@@ -1,14 +1,18 @@
 import { useEffect, useMemo, useState } from 'react'
 import Header from '@/components/Header'
 import RoleBadge from '@/components/RoleBadge'
-import { collection, getDocs, orderBy, query } from 'firebase/firestore'
-import { db } from '@/lib/firebase'
-import { GameRole, Match, Player } from '@/types'
+import { getDocs, orderBy, query } from 'firebase/firestore'
+import { fetchMembers } from '@/lib/members'
+import { matchesCollection } from '@/lib/paths'
+import { getEffectiveElo } from '@/lib/roleTier'
+import { useCommunity } from '@/lib/useCommunity'
+import { GameRole, Match } from '@/types'
+import { Member } from '@/types/member'
 
 interface MatchWithPlayers extends Omit<Match, 'players'> {
   id: string
   players: {
-    player: Player
+    player: Member
     role: GameRole
     team: 'BLUE' | 'RED'
   }[]
@@ -16,8 +20,7 @@ interface MatchWithPlayers extends Omit<Match, 'players'> {
 
 const ROLES: GameRole[] = [GameRole.TOP, GameRole.JUNGLE, GameRole.MID, GameRole.ADC, GameRole.SUP]
 
-const getRateForRole = (player: Player, role: GameRole) =>
-  role === player.mainRole ? player.mainRate : player.subRate
+const getRateForRole = (member: Member, role: GameRole) => getEffectiveElo(member, role)
 
 const fmtDate = (seconds: number) => {
   const d = new Date(seconds * 1000)
@@ -29,19 +32,21 @@ const fmtDate = (seconds: number) => {
 }
 
 export default function MatchesPage() {
+  const { community } = useCommunity()
   const [matches, setMatches] = useState<MatchWithPlayers[]>([])
   const [filter, setFilter] = useState<'ALL' | 'BLUE' | 'RED'>('ALL')
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!community) return
     const fetchData = async () => {
-      const playersSnapshot = await getDocs(collection(db, 'players'))
-      const playersMap = playersSnapshot.docs.reduce((acc, d) => {
-        acc[d.id] = { id: d.id, ...d.data() } as Player
+      const memberList = await fetchMembers(community.id)
+      const playersMap = memberList.reduce((acc, m) => {
+        acc[m.id] = m
         return acc
-      }, {} as Record<string, Player>)
+      }, {} as Record<string, Member>)
 
-      const matchesSnapshot = await getDocs(query(collection(db, 'matches'), orderBy('date', 'desc')))
+      const matchesSnapshot = await getDocs(query(matchesCollection(community.id), orderBy('date', 'desc')))
       const rows = matchesSnapshot.docs.map((d) => {
         const match = { id: d.id, ...d.data() } as Match
         return {
@@ -57,7 +62,7 @@ export default function MatchesPage() {
     }
 
     fetchData().catch(console.error)
-  }, [])
+  }, [community?.id])
 
   const filtered = useMemo(() => {
     if (filter === 'ALL') return matches

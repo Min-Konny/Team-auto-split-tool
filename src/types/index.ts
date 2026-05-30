@@ -29,20 +29,21 @@ export const RANK_RATES: { [key in Rank]: RankRate } = {
   CHALLENGER: { main: 3000, sub: 2700 }
 }
 
+/** @deprecated Member を使用 */
 export interface Player {
   id: string
-  name: string // サモナーネーム
-  nickname?: string // ニックネーム（Discord表示名）
+  name: string
+  nickname?: string
   mainRole: GameRole
   mainRate: number
   subRate: number
-  stats: {
-    wins: number
-    losses: number
-  }
-  tags?: string[] // タグ機能を追加
-  unwantedRoles?: GameRole[] // 絶対にやりたくないロール
+  stats: { wins: number; losses: number }
+  tags?: string[]
+  unwantedRoles?: GameRole[]
 }
+
+export type { Member, RoleTier, RoleMap, LegacyPlayer } from '@/types/member'
+export type { Community } from '@/types/community'
 
 export interface SelectedPlayer {
   player: Player & { id: string }
@@ -61,6 +62,13 @@ export interface Teams {
   red: TeamPlayer[]
 }
 
+export interface MatchEloChange {
+  memberId: string
+  before: number
+  after: number
+  delta: number
+}
+
 export interface Match {
   id: string
   date: {
@@ -73,4 +81,7 @@ export interface Match {
     team: 'BLUE' | 'RED'
   }[]
   winner: 'BLUE' | 'RED'
+  eloChanges?: MatchEloChange[]
+  balanceScore?: number
+  splitMode?: string
 } 

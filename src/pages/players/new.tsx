@@ -1,10 +1,13 @@
 import { useState } from 'react'
 import Link from 'next/link'
-import { collection, addDoc } from 'firebase/firestore'
 import { useRouter } from 'next/router'
 import Header from '@/components/Header'
-import { db } from '@/lib/firebase'
-import { GameRole, Player, RANK_RATES, Rank } from '@/types'
+import RoleTierGrid from '@/components/RoleTierGrid'
+import { addMember } from '@/lib/members'
+import { defaultRoleMap, getMainRoleFromMap, validateRoleMap } from '@/lib/roleTier'
+import { useCommunity } from '@/lib/useCommunity'
+import { GameRole, RANK_RATES, Rank } from '@/types'
+import { RoleMap } from '@/types/member'
 
 const AVAILABLE_TAGS = ['249', 'SHIFT', 'きらくに', 'その他']
 const ROLES: GameRole[] = [GameRole.TOP, GameRole.JUNGLE, GameRole.MID, GameRole.ADC, GameRole.SUP]
@@ -39,44 +42,44 @@ const getRankFromRate = (rate: number): Rank => {
 }
 
 export default function NewPlayerPage() {
+  const { community } = useCommunity()
   const [name, setName] = useState('')
   const [nick, setNick] = useState('')
-  const [role, setRole] = useState<GameRole | ''>('')
+  const [roles, setRoles] = useState<RoleMap>(defaultRoleMap(GameRole.MID))
   const [rank, setRank] = useState<Rank>('GOLD')
   const [tags, setTags] = useState<string[]>([])
-  const [unwanted, setUnwanted] = useState<GameRole[]>([])
   const [errors, setErrors] = useState<{ name?: string; role?: string; tags?: string }>({})
   const [saved, setSaved] = useState(false)
   const router = useRouter()
 
-  const canSubmit = name.trim() && role && tags.length > 0
+  const mainRole = getMainRoleFromMap(roles)
+  const canSubmit = name.trim() && mainRole && tags.length > 0
 
   const toggleTag = (t: string) => setTags((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]))
-  const toggleUnwanted = (r: GameRole) =>
-    setUnwanted((prev) => (prev.includes(r) ? prev.filter((x) => x !== r) : [...prev, r]))
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!community) return
     const nextErrors: { name?: string; role?: string; tags?: string } = {}
     if (!name.trim()) nextErrors.name = 'サモナーネームを入力してください'
-    if (!role) nextErrors.role = 'メインロールを選択してください'
+    const roleErr = validateRoleMap(roles)
+    if (roleErr) nextErrors.role = roleErr
     if (tags.length === 0) nextErrors.tags = 'タグを1つ以上選択してください'
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
+    const mr = getMainRoleFromMap(roles)!
     const rates = RANK_RATES[rank]
-    const player: Omit<Player, 'id'> = {
+
+    await addMember(community.id, {
       name: name.trim(),
       nickname: nick.trim() || undefined,
-      mainRole: role as GameRole,
-      mainRate: rates.main,
-      subRate: rates.sub,
+      elo: rates.main,
+      roles,
+      mainRole: mr,
       stats: { wins: 0, losses: 0 },
       tags,
-      ...(unwanted.length > 0 ? { unwantedRoles: unwanted } : {}),
-    }
-
-    await addDoc(collection(db, 'players'), player)
+    })
     setSaved(true)
     setTimeout(() => {
       router.push('/players')
@@ -84,6 +87,7 @@ export default function NewPlayerPage() {
   }
 
   const rates = RANK_RATES[rank]
+  const previewRole = mainRole || GameRole.MID
 
   return (
     <div>
@@ -109,14 +113,8 @@ export default function NewPlayerPage() {
             </section>
 
             <section className="fsec">
-              <label className="fsec-lbl">メインロール *</label>
-              <div className="role-grid">
-                {ROLES.map((r) => (
-                  <button key={r} type="button" className={`role-btn${role === r ? ` sel-${r}` : ''}`} onClick={() => { setRole(r); setErrors((p) => ({ ...p, role: undefined })) }}>
-                    <span className="role-icon">{ROLE_ICONS[r]}</span>{r}
-                  </button>
-                ))}
-              </div>
+              <label className="fsec-lbl">ロール適性 *（◎は1つ）</label>
+              <RoleTierGrid roles={roles} onChange={(r) => { setRoles(r); setErrors((p) => ({ ...p, role: undefined })) }} />
               {errors.role && <div className="err-msg">{errors.role}</div>}
             </section>
 
@@ -144,19 +142,7 @@ export default function NewPlayerPage() {
               {errors.tags && <div className="err-msg">{errors.tags}</div>}
             </section>
 
-            <section className="fsec">
-              <label className="fsec-lbl">NGロール（任意）</label>
-              <div className="chip-row">
-                {ROLES.map((r) => (
-                  <button key={r} type="button" className={`chip${unwanted.includes(r) ? ' on-red' : ''}`} onClick={() => toggleUnwanted(r)}>
-                    {r}
-                  </button>
-                ))}
-              </div>
-              <div className="form-hint">絶対にやりたくないロール。チーム自動振り分け時に除外されます。</div>
-            </section>
-
-            <button className="submit-btn" type="submit" disabled={!canSubmit}>登録する</button>
+            <button className="submit-btn" type="submit" disabled={!canSubmit || !community}>登録する</button>
           </form>
         </section>
 
@@ -167,21 +153,15 @@ export default function NewPlayerPage() {
               <>
                 <div className="pv-name">{nick || name}</div>
                 {nick && <div className="pv-sub">{name}</div>}
-                {role && <div className={`pv-role-badge ${role}`}>{role}</div>}
+                {mainRole && <div className={`pv-role-badge ${previewRole}`}>{previewRole} ◎</div>}
                 <div className="pv-rates">
                   <div className="pv-rate-block">
-                    <div className="pv-rate-k">MAIN</div>
+                    <div className="pv-rate-k">ELO</div>
                     <div className="pv-rate-v">{rates.main}</div>
                     <div className="pv-rank" style={{ color: RANK_COLORS[getRankFromRate(rates.main)] }}>{getRankFromRate(rates.main)}</div>
                   </div>
-                  <div className="pv-rate-block">
-                    <div className="pv-rate-k">SUB</div>
-                    <div className="pv-rate-v">{rates.sub}</div>
-                    <div className="pv-rank" style={{ color: RANK_COLORS[getRankFromRate(rates.sub)] }}>{getRankFromRate(rates.sub)}</div>
-                  </div>
                 </div>
                 {tags.length > 0 && <div className="pv-tags">{tags.map((t) => <span className="pv-tag" key={t}>{t}</span>)}</div>}
-                {unwanted.length > 0 && <div className="pv-tags">{unwanted.map((r) => <span className="pv-ng-chip" key={r}>{r}</span>)}</div>}
               </>
             ) : (
               <div className="pv-empty">入力するとここにプレビューされます</div>

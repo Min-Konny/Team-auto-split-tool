@@ -2,14 +2,19 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/Header'
 import RoleBadge from '@/components/RoleBadge'
-import { collection, deleteDoc, doc, getDocs, orderBy, query, updateDoc } from 'firebase/firestore'
+import { deleteDoc, doc, getDocs, orderBy, query } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { GameRole, Match, Player } from '@/types'
+import RoleTierGrid from '@/components/RoleTierGrid'
+import { fetchMembers } from '@/lib/members'
+import { matchesCollection } from '@/lib/paths'
+import { normalizeRoleMap, validateRoleMap } from '@/lib/roleTier'
+import { useCommunity } from '@/lib/useCommunity'
+import { GameRole, Match } from '@/types'
+import { Member, RoleMap } from '@/types/member'
 
-const ROLES: GameRole[] = [GameRole.TOP, GameRole.JUNGLE, GameRole.MID, GameRole.ADC, GameRole.SUP]
 const DEFAULT_TAGS = ['249', 'SHIFT', 'その他', '交流']
 
-type PlayerWithId = Player & { id: string }
+type MemberWithId = Member & { id: string }
 type MatchWithPlayer = Match & { playerTeam: 'BLUE' | 'RED'; playerRole: string; isWinner: boolean }
 
 const getRankFromRate = (rate: number) => {
@@ -42,30 +47,30 @@ const getRankColor = (rank: string) =>
   }[rank] || 'var(--fg-2)')
 
 export default function PlayersPage() {
-  const [players, setPlayers] = useState<PlayerWithId[]>([])
+  const { community } = useCommunity()
+  const [players, setPlayers] = useState<MemberWithId[]>([])
   const [search, setSearch] = useState('')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [sortBy, setSortBy] = useState<'mainRate' | 'subRate' | 'wr' | 'name'>('mainRate')
+  const [sortBy, setSortBy] = useState<'elo' | 'wr' | 'name'>('elo')
 
-  const [editTarget, setEditTarget] = useState<PlayerWithId | null>(null)
-  const [historyTarget, setHistoryTarget] = useState<PlayerWithId | null>(null)
+  const [editTarget, setEditTarget] = useState<MemberWithId | null>(null)
+  const [historyTarget, setHistoryTarget] = useState<MemberWithId | null>(null)
   const [history, setHistory] = useState<MatchWithPlayer[]>([])
 
   const [name, setName] = useState('')
   const [nickname, setNickname] = useState('')
-  const [mainRate, setMainRate] = useState(0)
-  const [subRate, setSubRate] = useState(0)
+  const [elo, setElo] = useState(0)
+  const [roles, setRoles] = useState<RoleMap | null>(null)
   const [tags, setTags] = useState<string[]>([])
-  const [unwantedRoles, setUnwantedRoles] = useState<GameRole[]>([])
 
   const fetchPlayers = async () => {
-    const snapshot = await getDocs(collection(db, 'players'))
-    setPlayers(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as PlayerWithId)))
+    if (!community) return
+    setPlayers(await fetchMembers(community.id))
   }
 
   useEffect(() => {
     fetchPlayers().catch(console.error)
-  }, [])
+  }, [community?.id])
 
   const availableTags = useMemo(
     () => Array.from(new Set([...DEFAULT_TAGS, ...players.flatMap((p) => p.tags || [])])).filter(Boolean),
@@ -82,8 +87,7 @@ export default function PlayersPage() {
     })
 
     return list.sort((a, b) => {
-      if (sortBy === 'mainRate') return b.mainRate - a.mainRate
-      if (sortBy === 'subRate') return b.subRate - a.subRate
+      if (sortBy === 'elo') return b.elo - a.elo
       if (sortBy === 'wr') {
         const aw = a.stats.wins + a.stats.losses === 0 ? 0 : Math.round((a.stats.wins / (a.stats.wins + a.stats.losses)) * 100)
         const bw = b.stats.wins + b.stats.losses === 0 ? 0 : Math.round((b.stats.wins / (b.stats.wins + b.stats.losses)) * 100)
@@ -93,39 +97,53 @@ export default function PlayersPage() {
     })
   }, [players, search, selectedTags, sortBy])
 
-  const openEdit = (player: PlayerWithId) => {
+  const openEdit = (player: MemberWithId) => {
     setEditTarget(player)
     setName(player.name)
     setNickname(player.nickname || '')
-    setMainRate(player.mainRate)
-    setSubRate(player.subRate)
+    setElo(player.elo)
+    setRoles({ ...player.roles })
     setTags([...(player.tags || [])])
-    setUnwantedRoles([...(player.unwantedRoles || [])])
   }
 
   const saveEdit = async () => {
-    if (!editTarget) return
-    await updateDoc(doc(db, 'players', editTarget.id), {
-      name: name.trim(),
-      nickname: nickname.trim() || null,
-      mainRate,
-      subRate,
-      tags,
-      unwantedRoles,
+    if (!editTarget || !community || !roles) return
+    const roleErr = validateRoleMap(roles)
+    if (roleErr) return
+    const { roles: normalizedRoles } = normalizeRoleMap(roles)
+    const res = await fetch('/api/members/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        memberId: editTarget.id,
+        name: name.trim(),
+        nickname: nickname.trim(),
+        elo,
+        roles: normalizedRoles,
+        tags,
+      }),
     })
+    if (!res.ok) {
+      const err = (await res.json().catch(() => ({}))) as { error?: string }
+      console.error(err.error || '更新に失敗しました')
+      return
+    }
     await fetchPlayers()
     setEditTarget(null)
   }
 
-  const removePlayer = async (player: PlayerWithId) => {
+  const removePlayer = async (player: MemberWithId) => {
+    if (!community) return
     if (!window.confirm(`${player.nickname || player.name} を削除しますか？`)) return
-    await deleteDoc(doc(db, 'players', player.id))
+    await deleteDoc(doc(db, 'communities', community.id, 'members', player.id))
     await fetchPlayers()
   }
 
-  const openHistory = async (player: PlayerWithId) => {
+  const openHistory = async (player: MemberWithId) => {
+    if (!community) return
     setHistoryTarget(player)
-    const snapshot = await getDocs(query(collection(db, 'matches'), orderBy('date', 'desc')))
+    const snapshot = await getDocs(query(matchesCollection(community.id), orderBy('date', 'desc')))
     const rows = snapshot.docs
       .map((d) => ({ id: d.id, ...d.data() } as Match))
       .filter((m) => m.players.some((p) => p.playerId === player.id))
@@ -150,8 +168,7 @@ export default function PlayersPage() {
         <div className="filters">
           <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="名前で検索" />
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value as typeof sortBy)}>
-            <option value="mainRate">メインレート順</option>
-            <option value="subRate">サブレート順</option>
+            <option value="elo">ELO順</option>
             <option value="wr">勝率順</option>
             <option value="name">名前順</option>
           </select>
@@ -165,7 +182,7 @@ export default function PlayersPage() {
         </div>
 
         <div className="table">
-          <div className="row hd">{['プレイヤー', 'Role', 'Main', 'Sub', 'WR', 'タグ', 'NG', ''].map((h) => <div key={h}>{h}</div>)}</div>
+          <div className="row hd">{['プレイヤー', 'Role', 'ELO', 'WR', 'タグ', ''].map((h) => <div key={h}>{h}</div>)}</div>
           {filtered.map((p) => {
             const total = p.stats.wins + p.stats.losses
             const wr = total === 0 ? 0 : Math.round((p.stats.wins / total) * 100)
@@ -173,11 +190,9 @@ export default function PlayersPage() {
               <div className="row" key={p.id}>
                 <div><div className="nm">{p.nickname || p.name}</div>{p.nickname && <div className="sub">{p.name}</div>}</div>
                 <div><RoleBadge role={p.mainRole} /></div>
-                <div><div className="num">{p.mainRate}</div><div className="sub" style={{ color: getRankColor(getRankFromRate(p.mainRate)) }}>{getRankFromRate(p.mainRate)}</div></div>
-                <div><div className="num">{p.subRate}</div><div className="sub" style={{ color: getRankColor(getRankFromRate(p.subRate)) }}>{getRankFromRate(p.subRate)}</div></div>
+                <div><div className="num">{p.elo}</div><div className="sub" style={{ color: getRankColor(getRankFromRate(p.elo)) }}>{getRankFromRate(p.elo)}</div></div>
                 <div><div className="num" style={{ color: wr >= 50 ? 'var(--ok)' : 'var(--red)' }}>{wr}%</div><div className="sub">{p.stats.wins}W {p.stats.losses}L</div></div>
                 <div className="chips mini">{(p.tags || []).map((t) => <span key={t}>{t}</span>)}</div>
-                <div className="chips mini">{(p.unwantedRoles || []).map((r) => <span key={r} className="ng">{r}</span>)}</div>
                 <div className="acts">
                   <button onClick={() => openHistory(p)}>⏱</button>
                   <button onClick={() => openEdit(p)}>✎</button>
@@ -194,16 +209,13 @@ export default function PlayersPage() {
           <div className="modal">
             <h3>{editTarget.nickname || editTarget.name} を編集</h3>
             <div className="grid">
-              <input value={name} onChange={(e) => setName(e.target.value)} />
-              <input value={nickname} onChange={(e) => setNickname(e.target.value)} />
-              <input type="number" value={mainRate} onChange={(e) => setMainRate(Number(e.target.value) || 0)} />
-              <input type="number" value={subRate} onChange={(e) => setSubRate(Number(e.target.value) || 0)} />
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="サモナー名" />
+              <input value={nickname} onChange={(e) => setNickname(e.target.value)} placeholder="ニックネーム" />
+              <input type="number" value={elo} onChange={(e) => setElo(Number(e.target.value) || 0)} placeholder="ELO" />
             </div>
+            {roles && <RoleTierGrid roles={roles} onChange={setRoles} />}
             <div className="chips">
               {availableTags.map((t) => <button key={t} className={tags.includes(t) ? 'active' : ''} onClick={() => setTags((p) => p.includes(t) ? p.filter((x) => x !== t) : [...p, t])}>{t}</button>)}
-            </div>
-            <div className="chips">
-              {ROLES.map((r) => <button key={r} className={unwantedRoles.includes(r) ? 'active ng' : ''} onClick={() => setUnwantedRoles((p) => p.includes(r) ? p.filter((x) => x !== r) : [...p, r])}>{r}</button>)}
             </div>
             <div className="acts"><button onClick={() => setEditTarget(null)}>キャンセル</button><button onClick={saveEdit}>保存</button></div>
           </div>
@@ -240,7 +252,7 @@ export default function PlayersPage() {
         .chips button.active { background: color-mix(in oklch, var(--blue) 18%, transparent); border-color: var(--blue-d); color: var(--blue); }
         .chips .ng { border-radius: 4px; border-color: var(--red-d); color: var(--red); background: color-mix(in oklch, var(--red) 14%, transparent); }
         .table { border: 1px solid var(--line); border-radius: 14px; overflow: auto; background: var(--bg-1); }
-        .row { display: grid; grid-template-columns: 220px 72px 140px 140px 90px 120px 90px 100px; gap: 0; padding: 0 14px; align-items: center; border-bottom: 1px solid var(--line); min-width: 980px; }
+        .row { display: grid; grid-template-columns: 220px 72px 140px 90px 120px 100px; gap: 0; padding: 0 14px; align-items: center; border-bottom: 1px solid var(--line); min-width: 820px; }
         .row > div { padding: 10px 8px; }
         .row.hd { background: var(--bg-2); font-family: 'JetBrains Mono'; font-size: 10px; color: var(--fg-3); letter-spacing: .12em; }
         .nm { font-weight: 600; }

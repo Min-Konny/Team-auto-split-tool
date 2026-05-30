@@ -1,6 +1,7 @@
 import { ChakraProvider } from '@chakra-ui/react'
 import type { AppProps } from 'next/app'
 import { Inter, JetBrains_Mono, Space_Grotesk } from 'next/font/google'
+import CommunityGuard from '@/components/CommunityGuard'
 import theme from '@/theme'
 import '@/styles/tokens.css'
 
@@ -12,7 +13,9 @@ export default function App({ Component, pageProps }: AppProps) {
   return (
     <div className={`${inter.className} ${mono.variable} ${display.variable}`}>
       <ChakraProvider theme={theme}>
-        <Component {...pageProps} />
+        <CommunityGuard>
+          <Component {...pageProps} />
+        </CommunityGuard>
       </ChakraProvider>
     </div>
   )
