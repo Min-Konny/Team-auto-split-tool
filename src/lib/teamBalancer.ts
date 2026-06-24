@@ -197,7 +197,7 @@ export function generateThreeCandidates(members: Member[]): SplitCandidate[] {
 }
 
 export function getTotalRate(team: TeamSlot[]): number {
-  return team.reduce((s, t) => s + getEffectiveElo(t.member, t.role), 0)
+  return Math.round(team.reduce((s, t) => s + getEffectiveElo(t.member, t.role), 0))
 }
 
 export function getAvgRate(team: TeamSlot[]): number {

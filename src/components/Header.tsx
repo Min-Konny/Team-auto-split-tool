@@ -1,5 +1,7 @@
 import { Box, Flex, HStack, Link as CLink, Text } from '@chakra-ui/react'
 import Link from 'next/link'
+import { useRouter } from 'next/router'
+import { useCommunity } from '@/lib/useCommunity'
 
 const navItem = {
   px: 3.5,
@@ -12,6 +14,15 @@ const navItem = {
 }
 
 export default function Header() {
+  const { community, loading, refresh } = useCommunity()
+  const router = useRouter()
+
+  const logout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    refresh()
+    router.push('/community/join')
+  }
+
   return (
     <Box
       position="sticky"
@@ -56,6 +67,27 @@ export default function Header() {
           <CLink as={Link} href="/team-maker" sx={{ ...navItem, bg: 'var(--fg-0)', color: 'var(--bg-0)', ml: 2, _hover: { bg: 'var(--fg-1)' } }}>
             {'\u30c1\u30fc\u30e0\u4f5c\u6210'} {'\u2192'}
           </CLink>
+          {!loading && community && (
+            <>
+              <Text px={2} fontSize="12px" color="var(--fg-3)" whiteSpace="nowrap">
+                {community.name}
+              </Text>
+              <Box
+                as="button"
+                type="button"
+                onClick={logout}
+                sx={{
+                  ...navItem,
+                  border: '1px solid var(--line)',
+                  bg: 'transparent',
+                  cursor: 'pointer',
+                  _hover: { bg: 'var(--bg-2)', color: 'var(--fg-0)' },
+                }}
+              >
+                ログアウト
+              </Box>
+            </>
+          )}
         </HStack>
       </Flex>
     </Box>

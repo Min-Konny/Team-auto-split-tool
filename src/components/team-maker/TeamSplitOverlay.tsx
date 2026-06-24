@@ -71,7 +71,7 @@ export default function TeamSplitOverlay({
   const [showSwapHint, setShowSwapHint] = useState(false)
   const [copied, setCopied] = useState(false)
   const activeMetrics = candidates[activeCandidate]?.metrics
-  const totalDiff = Math.abs(getTotalRate(teams.blue) - getTotalRate(teams.red))
+  const totalDiff = Math.round(Math.abs(getTotalRate(teams.blue) - getTotalRate(teams.red)))
 
   useEffect(() => {
     if (shuffling) return
@@ -309,7 +309,9 @@ export default function TeamSplitOverlay({
             const { tp: bTp, idx: bIdx } = byRole(teams, 'blue', role)
             const { tp: rTp, idx: rIdx } = byRole(teams, 'red', role)
             const diff =
-              bTp && rTp ? Math.abs(getEffectiveElo(bTp.member, role) - getEffectiveElo(rTp.member, role)) : 0
+              bTp && rTp
+                ? Math.round(Math.abs(getEffectiveElo(bTp.member, role) - getEffectiveElo(rTp.member, role)))
+                : 0
             const isWarn = diff > LANE_DIFF_TOLERANCE
             const isSrcBlue = swapSource?.team === 'blue' && swapSource?.id === bTp?.member.id
             const isSrcRed = swapSource?.team === 'red' && swapSource?.id === rTp?.member.id

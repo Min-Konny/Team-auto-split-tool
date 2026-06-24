@@ -49,10 +49,14 @@ export function normalizeRoleMap(roles: RoleMap): { roles: RoleMap; mainRole: Ga
   return { roles: normalized, mainRole }
 }
 
+export function formatRate(value: number): number {
+  return Math.round(value)
+}
+
 export function getEffectiveElo(member: Member, role: GameRole): number {
   const tier = member.roles[role]
-  if (tier === 'NG') return member.elo * ROLE_TIER_MULTIPLIER.NG
-  return member.elo * ROLE_TIER_MULTIPLIER[tier]
+  const mult = tier === 'NG' ? ROLE_TIER_MULTIPLIER.NG : ROLE_TIER_MULTIPLIER[tier]
+  return formatRate(member.elo * mult)
 }
 
 export function roleAssignmentCost(member: Member, role: GameRole): number {
