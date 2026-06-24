@@ -10,10 +10,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const session = getSessionFromRequest(req)
-  if (!session) return res.status(200).json({ community: null, user: null })
+  if (!session) return res.status(200).json({ community: null })
 
   const snap = await getDoc(communityDoc(session.communityId))
-  if (!snap.exists()) return res.status(200).json({ community: null, user: null })
+  if (!snap.exists()) return res.status(200).json({ community: null })
 
   const data = snap.data()
   return res.status(200).json({
@@ -21,10 +21,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       id: snap.id,
       name: data?.name,
       hasPasscode: !!data?.passcodeHash,
-    },
-    user: {
-      id: session.userId,
-      username: session.username,
     },
   })
 }

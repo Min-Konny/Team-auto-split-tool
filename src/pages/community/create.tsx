@@ -6,8 +6,6 @@ import Header from '@/components/Header'
 
 export default function CommunityCreatePage() {
   const [name, setName] = useState('')
-  const [passcode, setPasscode] = useState('')
-  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -21,7 +19,7 @@ export default function CommunityCreatePage() {
       const res = await fetch('/api/community/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, passcode, username, password }),
+        body: JSON.stringify({ name, password }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '作成に失敗しました')
@@ -45,7 +43,7 @@ export default function CommunityCreatePage() {
         </Link>
         <h1>コミュニティを作成</h1>
         <p className="lead">
-          コミュニティのパスコードは<strong>新規メンバー登録時</strong>に使います。あなたのログインはユーザー名とパスワードです。
+          コミュニティ名と<strong>ログインパスワード</strong>を設定します。メンバーにはパスワードを共有してください。
         </p>
         <form onSubmit={submit}>
           <label>
@@ -53,26 +51,12 @@ export default function CommunityCreatePage() {
             <input value={name} onChange={(e) => setName(e.target.value)} required />
           </label>
           <label>
-            コミュニティのパスコード（4文字以上・メンバーに共有）
-            <input
-              type="password"
-              value={passcode}
-              onChange={(e) => setPasscode(e.target.value)}
-              minLength={4}
-              required
-            />
-          </label>
-          <label>
-            あなたのユーザー名（管理者）
-            <input value={username} onChange={(e) => setUsername(e.target.value)} required />
-          </label>
-          <label>
-            あなたのパスワード
+            ログインパスワード（4文字以上）
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              minLength={6}
+              minLength={4}
               required
             />
           </label>

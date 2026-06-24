@@ -6,14 +6,8 @@ export interface CommunityInfo {
   hasPasscode: boolean
 }
 
-export interface AuthUserInfo {
-  id: string
-  username: string
-}
-
 export function useCommunity() {
   const [community, setCommunity] = useState<CommunityInfo | null>(null)
-  const [user, setUser] = useState<AuthUserInfo | null>(null)
   const [loading, setLoading] = useState(true)
 
   const refresh = () => {
@@ -22,11 +16,9 @@ export function useCommunity() {
       .then((r) => r.json())
       .then((d) => {
         setCommunity(d.community ?? null)
-        setUser(d.user ?? null)
       })
       .catch(() => {
         setCommunity(null)
-        setUser(null)
       })
       .finally(() => setLoading(false))
   }
@@ -35,5 +27,5 @@ export function useCommunity() {
     refresh()
   }, [])
 
-  return { community, user, loading, refresh }
+  return { community, loading, refresh }
 }

@@ -1,9 +1,12 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { assertAdminForUsers } from '@/lib/communityUsersServer'
-import { ensurePresetCommunitiesAndSplit } from '@/lib/splitCommunitiesByTags'
+import {
+  ensurePresetCommunitiesAndSplit,
+  ensureShiftMembersFromDefault,
+} from '@/lib/splitCommunitiesByTags'
 import { assertSessionSecretConfigured } from '@/lib/sessionSecret'
 
-/** 249 / きらくに の作成と default からのタグ分離（冪等） */
+/** 249 / きらくに / SHIFT の作成と default からのタグ分離（冪等） */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST')
@@ -25,7 +28,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const result = await ensurePresetCommunitiesAndSplit()
-    return res.status(200).json(result)
+    const shiftMoved = await ensureShiftMembersFromDefault()
+    return res.status(200).json({ ...result, shiftMoved })
   } catch (e) {
     console.error('setup-communities:', e)
     return res.status(500).json({ error: e instanceof Error ? e.message : '移行に失敗しました' })
