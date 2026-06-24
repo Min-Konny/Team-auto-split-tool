@@ -47,6 +47,7 @@ export default function Home() {
             </span>
           </Link>
           <nav className="nav">
+            <Link href="/community/join">{'\u30b3\u30df\u30e5\u30cb\u30c6\u30a3'}</Link>
             <Link href="/players">{'\u30d7\u30ec\u30a4\u30e4\u30fc'}</Link>
             <Link href="/players/new">{'\u767b\u9332'}</Link>
             <Link href="/matches">{'\u8a66\u5408\u5c65\u6b74'}</Link>

@@ -2,10 +2,11 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useCommunity } from '@/lib/useCommunity'
 
-const PUBLIC_PREFIXES = ['/community', '/join/lobby']
+const PUBLIC_PREFIXES = ['/', '/community', '/join/lobby']
 
 function isPublicPath(pathname: string): boolean {
-  return PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+  if (pathname === '/') return true
+  return PUBLIC_PREFIXES.some((p) => p !== '/' && (pathname === p || pathname.startsWith(`${p}/`)))
 }
 
 type Props = {

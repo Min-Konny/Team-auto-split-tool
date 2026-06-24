@@ -1,26 +1,44 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import Header from '@/components/Header'
 import { COMMUNITY_249_ID, PRESET_COMMUNITIES } from '@/constants/community'
 
+const CUSTOM_ID = '__custom__'
+
 export default function CommunityJoinPage() {
   const [communityId, setCommunityId] = useState(COMMUNITY_249_ID)
+  const [customId, setCustomId] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const router = useRouter()
 
+  useEffect(() => {
+    const q = router.query.id
+    if (typeof q === 'string' && q.trim()) {
+      setCommunityId(CUSTOM_ID)
+      setCustomId(q.trim())
+    }
+  }, [router.query.id])
+
+  const isCustom = communityId === CUSTOM_ID
+  const resolvedId = isCustom ? customId.trim() : communityId
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!resolvedId) {
+      setError('コミュニティ ID を入力してください')
+      return
+    }
     setBusy(true)
     setError(null)
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ communityId, password }),
+        body: JSON.stringify({ communityId: resolvedId, password }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '失敗しました')
@@ -39,8 +57,8 @@ export default function CommunityJoinPage() {
       </Head>
       <Header />
       <main className="comm-page">
-        <Link href="/community" className="back">
-          ← 戻る
+        <Link href="/" className="back">
+          ← トップへ
         </Link>
         <h1>コミュニティに参加</h1>
         <p className="lead">
@@ -59,9 +77,29 @@ export default function CommunityJoinPage() {
               <span className="comm-id">ID: {c.id}</span>
             </button>
           ))}
+          <button
+            type="button"
+            className={`comm-card comm-card-wide${isCustom ? ' active' : ''}`}
+            onClick={() => setCommunityId(CUSTOM_ID)}
+          >
+            <span className="comm-name">その他</span>
+            <span className="comm-id">既存のコミュニティ ID を入力</span>
+          </button>
         </div>
 
         <form onSubmit={submit}>
+          {isCustom && (
+            <label>
+              コミュニティ ID
+              <input
+                value={customId}
+                onChange={(e) => setCustomId(e.target.value)}
+                placeholder="作成時に表示された ID"
+                autoComplete="off"
+                required
+              />
+            </label>
+          )}
           <label>
             パスワード
             <input
@@ -77,6 +115,13 @@ export default function CommunityJoinPage() {
             {busy ? 'ログイン中…' : 'ログイン'}
           </button>
         </form>
+
+        <div className="create-box">
+          <p>まだコミュニティがない場合</p>
+          <Link href="/community/create" className="create-link">
+            新しいコミュニティを作る →
+          </Link>
+        </div>
       </main>
       <style dangerouslySetInnerHTML={{ __html: css }} />
     </>
@@ -90,6 +135,7 @@ const css = `
 .lead{font-size:13px;color:var(--fg-2);line-height:1.5;margin:0 0 20px}
 .community-pick{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
 .comm-card{padding:14px;border-radius:12px;border:1px solid var(--line);background:var(--bg-1);cursor:pointer;text-align:left}
+.comm-card-wide{grid-column:1/-1}
 .comm-card.active{border-color:var(--blue-d);background:color-mix(in oklch,var(--blue) 12%,transparent)}
 .comm-name{display:block;font-weight:700;font-size:15px}
 .comm-id{display:block;font-size:11px;color:var(--fg-3);margin-top:4px;font-family:'JetBrains Mono'}
@@ -99,4 +145,8 @@ input{padding:11px 12px;border-radius:9px;border:1px solid var(--line);backgroun
 button[type=submit]{padding:13px;border-radius:10px;border:0;background:var(--fg-0);color:var(--bg-0);font-weight:700;cursor:pointer}
 button:disabled{opacity:.4}
 .err{color:var(--red);font-size:13px}
+.create-box{margin-top:28px;padding-top:20px;border-top:1px solid var(--line);text-align:center}
+.create-box p{margin:0 0 10px;font-size:12px;color:var(--fg-3)}
+.create-link{display:inline-block;font-size:14px;font-weight:600;color:var(--blue);text-decoration:none}
+.create-link:hover{text-decoration:underline}
 `

@@ -8,6 +8,7 @@ export default function CommunityCreatePage() {
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [created, setCreated] = useState<{ id: string; name: string } | null>(null)
   const [busy, setBusy] = useState(false)
   const router = useRouter()
 
@@ -23,7 +24,7 @@ export default function CommunityCreatePage() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '作成に失敗しました')
-      router.push('/team-maker')
+      setCreated({ id: data.communityId, name: data.name })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'エラー')
     } finally {
@@ -38,13 +39,25 @@ export default function CommunityCreatePage() {
       </Head>
       <Header />
       <main className="comm-page">
-        <Link href="/community" className="back">
-          ← 戻る
+        <Link href="/" className="back">
+          ← トップへ
         </Link>
         <h1>コミュニティを作成</h1>
         <p className="lead">
-          コミュニティ名と<strong>ログインパスワード</strong>を設定します。メンバーにはパスワードを共有してください。
+          コミュニティ名と<strong>ログインパスワード</strong>を設定します。メンバーには ID とパスワードを共有してください。
         </p>
+        {created ? (
+          <div className="success-box">
+            <p>
+              <strong>{created.name}</strong> を作成しました
+            </p>
+            <p className="id-label">コミュニティ ID（メンバーに共有）</p>
+            <code className="id-code">{created.id}</code>
+            <button type="button" onClick={() => router.push('/team-maker')}>
+              チーム作成へ進む
+            </button>
+          </div>
+        ) : (
         <form onSubmit={submit}>
           <label>
             コミュニティ名
@@ -65,6 +78,7 @@ export default function CommunityCreatePage() {
             {busy ? '作成中…' : '作成してログイン'}
           </button>
         </form>
+        )}
       </main>
       <style dangerouslySetInnerHTML={{ __html: css }} />
     </>
@@ -82,4 +96,9 @@ input{padding:11px 12px;border-radius:9px;border:1px solid var(--line);backgroun
 button{padding:13px;border-radius:10px;border:0;background:var(--fg-0);color:var(--bg-0);font-weight:700;cursor:pointer}
 button:disabled{opacity:.4}
 .err{color:var(--red);font-size:13px}
+.success-box{display:flex;flex-direction:column;gap:14px;padding:18px;border-radius:12px;border:1px solid var(--line);background:var(--bg-1)}
+.success-box p{margin:0;font-size:14px}
+.id-label{margin:0;font-size:12px;color:var(--fg-3)}
+.id-code{display:block;padding:12px;border-radius:8px;background:var(--bg-0);border:1px solid var(--line);font-family:'JetBrains Mono';font-size:13px;word-break:break-all}
+.success-box button{padding:13px;border-radius:10px;border:0;background:var(--fg-0);color:var(--bg-0);font-weight:700;cursor:pointer}
 `
