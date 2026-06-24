@@ -7,6 +7,8 @@ import Header from '@/components/Header'
 export default function CommunityCreatePage() {
   const [name, setName] = useState('')
   const [passcode, setPasscode] = useState('')
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const router = useRouter()
@@ -19,7 +21,7 @@ export default function CommunityCreatePage() {
       const res = await fetch('/api/community/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, passcode }),
+        body: JSON.stringify({ name, passcode, username, password }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '作成に失敗しました')
@@ -42,13 +44,16 @@ export default function CommunityCreatePage() {
           ← 戻る
         </Link>
         <h1>コミュニティを作成</h1>
+        <p className="lead">
+          コミュニティのパスコードは<strong>新規メンバー登録時</strong>に使います。あなたのログインはユーザー名とパスワードです。
+        </p>
         <form onSubmit={submit}>
           <label>
-            名前
+            コミュニティ名
             <input value={name} onChange={(e) => setName(e.target.value)} required />
           </label>
           <label>
-            パスコード（4文字以上）
+            コミュニティのパスコード（4文字以上・メンバーに共有）
             <input
               type="password"
               value={passcode}
@@ -57,9 +62,23 @@ export default function CommunityCreatePage() {
               required
             />
           </label>
+          <label>
+            あなたのユーザー名（管理者）
+            <input value={username} onChange={(e) => setUsername(e.target.value)} required />
+          </label>
+          <label>
+            あなたのパスワード
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              minLength={6}
+              required
+            />
+          </label>
           {error && <p className="err">{error}</p>}
           <button type="submit" disabled={busy}>
-            {busy ? '作成中…' : '作成して始める'}
+            {busy ? '作成中…' : '作成してログイン'}
           </button>
         </form>
       </main>
@@ -71,7 +90,8 @@ export default function CommunityCreatePage() {
 const css = `
 .comm-page{max-width:420px;margin:0 auto;padding:40px 24px}
 .back{font-size:12px;color:var(--fg-3);text-decoration:none}
-.comm-page h1{font-family:'Space Grotesk';font-size:22px;margin:16px 0 20px}
+.comm-page h1{font-family:'Space Grotesk';font-size:22px;margin:16px 0 8px}
+.lead{font-size:13px;color:var(--fg-2);line-height:1.5;margin:0 0 20px}
 form{display:flex;flex-direction:column;gap:16px}
 label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--fg-3)}
 input{padding:11px 12px;border-radius:9px;border:1px solid var(--line);background:var(--bg-1);color:var(--fg-0)}

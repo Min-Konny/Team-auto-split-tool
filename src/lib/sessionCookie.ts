@@ -5,6 +5,8 @@ const MAX_AGE_SEC = 60 * 60 * 24 * 30
 
 export interface SessionPayload {
   communityId: string
+  userId: string
+  username: string
   exp: number
 }
 
@@ -35,7 +37,7 @@ export function decodeSession(token: string): SessionPayload | null {
   }
   try {
     const json = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as SessionPayload
-    if (!json.communityId || !json.exp) return null
+    if (!json.communityId || !json.userId || !json.username || !json.exp) return null
     if (Date.now() > json.exp) return null
     return json
   } catch {
@@ -43,9 +45,15 @@ export function decodeSession(token: string): SessionPayload | null {
   }
 }
 
-export function newSessionPayload(communityId: string): SessionPayload {
+export function newSessionPayload(
+  communityId: string,
+  userId: string,
+  username: string
+): SessionPayload {
   return {
     communityId,
+    userId,
+    username,
     exp: Date.now() + MAX_AGE_SEC * 1000,
   }
 }

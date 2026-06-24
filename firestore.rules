@@ -35,6 +35,11 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      match /users/{userId} {
+        allow read: if false;
+        allow write: if false;
+      }
+
       match /lobbies/{lobbyId} {
         allow read, write: if true;
       }

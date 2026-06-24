@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { decodeSession, SESSION_COOKIE } from '@/lib/sessionCookie'
+import { getSessionFromRequest } from '@/lib/apiAuth'
 import { getDoc } from 'firebase/firestore'
 import { communityDoc } from '@/lib/paths'
 
@@ -9,14 +9,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const token = req.cookies[SESSION_COOKIE]
-  if (!token) return res.status(200).json({ community: null })
-
-  const session = decodeSession(token)
-  if (!session) return res.status(200).json({ community: null })
+  const session = getSessionFromRequest(req)
+  if (!session) return res.status(200).json({ community: null, user: null })
 
   const snap = await getDoc(communityDoc(session.communityId))
-  if (!snap.exists()) return res.status(200).json({ community: null })
+  if (!snap.exists()) return res.status(200).json({ community: null, user: null })
 
   const data = snap.data()
   return res.status(200).json({
@@ -24,6 +21,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       id: snap.id,
       name: data?.name,
       hasPasscode: !!data?.passcodeHash,
+    },
+    user: {
+      id: session.userId,
+      username: session.username,
     },
   })
 }

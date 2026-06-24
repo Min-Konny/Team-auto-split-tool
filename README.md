@@ -23,9 +23,40 @@ League of Legendsのチーム分けツールです。プレイヤーのレート
 
 ## コミュニティ（P1）
 
-- `/community/join` → **メイン**（既存データ・パスコードなし）または ID + パスコードで参加
-- `/community/create` → 新規コミュニティ（bcrypt ハッシュでパスコード保存）
+- **ログイン**: コミュニティ + ユーザー名 + パスワード（コミュニティごとにアカウント）
+- **新規登録**: 上記に加え、コミュニティのパスコード（初回のみ・メンバーに共有）
+- プリセット:
+  - **249** … パスコード `0249`（プレイヤータグ `249` のデータはこちらへ分離）
+  - **きらくに** … ID `kirakuni`、パスコード `5656`（タグ `きらくに`）
+- `/community/create` → 任意の新規コミュニティ + 管理者ユーザー
 - セッションは httpOnly Cookie（`SESSION_SECRET` 必須）
+
+### 既存データの分離（初回）
+
+登録時に自動実行されます。手動で走らせる場合:
+
+```bash
+curl -X POST https://<your-app>/api/migration/setup-communities \
+  -H "Content-Type: application/json" \
+  -d '{"migrationSecret":"YOUR_SESSION_SECRET"}'
+```
+
+タグが `249` と `きらくに` の両方あるプレイヤーは **249** 側に入ります。
+
+### 既存プレイヤーのログインアカウント
+
+分離後、各コミュニティの **メンバー1人につき1アカウント** を自動作成します（初回登録・移行時）。
+
+- **仮パスワード**: `0000`（ログイン用。新規「登録」は不要）
+- **ユーザー名**: ニックネーム／名前の英数字部分。日本語のみの場合は `m_` + ID の一部
+
+手動で再実行する場合:
+
+```bash
+curl -X POST https://<your-app>/api/migration/seed-auth-users \
+  -H "Content-Type: application/json" \
+  -d '{"migrationSecret":"YOUR_SESSION_SECRET"}'
+```
 
 ## チーム分け（P0）
 
@@ -36,7 +67,7 @@ League of Legendsのチーム分けツールです。プレイヤーのレート
 
 ## データ構造
 
-初回アクセス時に `players` / `matches` は `communities/default/members` / `matches` へ自動移行されます。
+レガシーの `players` / `matches` は先に `communities/default` へ移行され、タグに応じて `249` / `kirakuni` へコピーされます。
 
 ```
 communities/{id}
