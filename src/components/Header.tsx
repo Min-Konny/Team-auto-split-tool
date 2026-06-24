@@ -40,9 +40,9 @@ export default function Header() {
               sx={{ clipPath: 'polygon(50% 100%,100% 100%,100% 50%)' }}
             />
           </Box>
-          <Text fontFamily="'Space Grotesk', sans-serif" fontWeight={600} fontSize="15px" color="var(--fg-0)">
+          <Text fontFamily="var(--font-display), sans-serif" fontWeight={600} fontSize="15px" color="var(--fg-0)">
             Team Maker
-            <Text as="span" ml={1} fontFamily="'JetBrains Mono', monospace" fontSize="10px" color="var(--fg-3)" letterSpacing="0.12em" textTransform="uppercase">
+            <Text as="span" ml={1} fontFamily="var(--font-mono), monospace" fontSize="10px" color="var(--fg-3)" letterSpacing="0.12em" textTransform="uppercase">
               / LoL
             </Text>
           </Text>

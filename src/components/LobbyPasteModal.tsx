@@ -2,10 +2,10 @@ import { useMemo, useState } from 'react'
 import { Member } from '@/types/member'
 import {
   matchPasteLines,
-  parseDiscordLines,
+  parseLobbyJoinLines,
   PasteLineResult,
   resolvedPlayerIds,
-} from '@/lib/discordPaste'
+} from '@/lib/lobbyPaste'
 
 type Props = {
   members: Member[]
@@ -14,12 +14,15 @@ type Props = {
   onApply: (playerIds: string[]) => void
 }
 
-export default function DiscordPasteModal({ members, open, onClose, onApply }: Props) {
+const EXAMPLE_PLACEHOLDER = `⁦⁦こにー⁩ #⁦0329⁩⁩がロビーに参加しました。
+⁦⁦たろう⁩ #⁦1234⁩⁩がロビーに参加しました。`
+
+export default function LobbyPasteModal({ members, open, onClose, onApply }: Props) {
   const [text, setText] = useState('')
   const [ambiguousPicks, setAmbiguousPicks] = useState<Record<number, string>>({})
   const [step, setStep] = useState<'paste' | 'review'>('paste')
 
-  const lines = useMemo(() => parseDiscordLines(text), [text])
+  const lines = useMemo(() => parseLobbyJoinLines(text), [text])
   const results: PasteLineResult[] = useMemo(
     () => (step === 'review' ? matchPasteLines(lines, members) : []),
     [step, lines, members]
@@ -66,12 +69,16 @@ export default function DiscordPasteModal({ members, open, onClose, onApply }: P
     <div className="paste-overlay" role="dialog" aria-modal="true">
       <div className="paste-modal">
         <div className="paste-hd">
-          <h3>Discord から追加</h3>
+          <h3>カスタム入室ログから追加</h3>
           <button type="button" className="paste-close" onClick={handleClose} aria-label="閉じる">
             ✕
           </button>
         </div>
-        <p className="paste-hint">VC のメンションや名前リストを貼り付け。1行1人で照合します。</p>
+        <p className="paste-hint">
+          LoL クライアントのカスタムロビーで表示される
+          <strong>「〇〇がロビーに参加しました。」</strong>
+          をそのまま貼り付けてください。サモナー名を自動で抽出します。
+        </p>
 
         {step === 'paste' && (
           <>
@@ -79,7 +86,7 @@ export default function DiscordPasteModal({ members, open, onClose, onApply }: P
               className="paste-area"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder={'@こにー\n@たろう\nさんかく'}
+              placeholder={EXAMPLE_PLACEHOLDER}
               rows={8}
             />
             <div className="paste-actions">
@@ -87,7 +94,7 @@ export default function DiscordPasteModal({ members, open, onClose, onApply }: P
                 キャンセル
               </button>
               <button type="button" className="paste-btn primary" disabled={lines.length === 0} onClick={handleParse}>
-                照合する ({lines.length} 行)
+                照合する ({lines.length} 人)
               </button>
             </div>
           </>
@@ -103,7 +110,7 @@ export default function DiscordPasteModal({ members, open, onClose, onApply }: P
             <ul className="paste-results">
               {results.map((r, i) => (
                 <li key={`${r.raw}-${i}`} className={`paste-row ${r.status}`}>
-                  <span className="paste-raw">{r.raw}</span>
+                  <span className="paste-raw">{r.normalized}</span>
                   {r.status === 'matched' && r.player && (
                     <span className="paste-res ok">→ {r.player.nickname || r.player.name}</span>
                   )}
@@ -148,6 +155,7 @@ const pasteStyles = `
 .paste-hd h3{margin:0;font-family:'Space Grotesk';font-size:17px}
 .paste-close{width:32px;height:32px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--fg-2);cursor:pointer}
 .paste-hint{margin:0 0 12px;font-size:12px;color:var(--fg-3);line-height:1.5}
+.paste-hint strong{color:var(--fg-1);font-weight:600}
 .paste-area{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg-0);color:var(--fg-0);font-family:'JetBrains Mono',monospace;font-size:12px;resize:vertical}
 .paste-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:14px}
 .paste-btn{padding:9px 18px;border-radius:9px;font-family:'Space Grotesk';font-weight:600;font-size:13px;cursor:pointer;border:1px solid var(--line)}

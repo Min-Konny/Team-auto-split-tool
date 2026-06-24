@@ -5,6 +5,12 @@ import { encodeSession, newSessionPayload, sessionCookieHeader } from '@/lib/ses
 import { assertSessionSecretConfigured } from '@/lib/sessionSecret'
 import { getAdminFirestore } from '@/lib/firebaseAdmin'
 import { PRESET_COMMUNITY_IDS } from '@/constants/community'
+import {
+  isFormLogin,
+  redirectLoginError,
+  redirectWithCookie,
+  safeRedirectPath,
+} from '@/lib/authRedirect'
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -12,20 +18,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
+  const form = isFormLogin(req)
+
   try {
     assertSessionSecretConfigured()
     assertAdminForUsers()
   } catch (e) {
-    return res.status(500).json({ error: e instanceof Error ? e.message : 'Server misconfigured' })
+    const msg = e instanceof Error ? e.message : 'Server misconfigured'
+    if (form) return redirectLoginError(res, msg)
+    return res.status(500).json({ error: msg })
   }
 
-  const { communityId, password } = req.body as {
+  const { communityId, password, redirect } = req.body as {
     communityId?: string
     password?: string
+    redirect?: string
   }
 
   const cid = communityId?.trim()
   if (!cid || !password) {
+    if (form) return redirectLoginError(res, 'コミュニティとパスワードが必要です', cid)
     return res.status(400).json({ error: 'コミュニティとパスワードが必要です' })
   }
 
@@ -35,19 +47,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const comm = await getAdminFirestore().collection('communities').doc(cid).get()
-    if (!comm.exists) return res.status(404).json({ error: 'コミュニティが見つかりません' })
+    if (!comm.exists) {
+      if (form) return redirectLoginError(res, 'コミュニティが見つかりません', cid)
+      return res.status(404).json({ error: 'コミュニティが見つかりません' })
+    }
 
     const ok = await verifyCommunityPassword(cid, password)
-    if (!ok) return res.status(401).json({ error: 'パスワードが違います' })
+    if (!ok) {
+      if (form) return redirectLoginError(res, 'パスワードが違います', cid)
+      return res.status(401).json({ error: 'パスワードが違います' })
+    }
 
     const token = encodeSession(newSessionPayload(cid))
-    res.setHeader('Set-Cookie', sessionCookieHeader(token))
+    const cookie = sessionCookieHeader(token)
+
+    if (form) {
+      return redirectWithCookie(res, safeRedirectPath(redirect), cookie)
+    }
+
+    res.setHeader('Set-Cookie', cookie)
     return res.status(200).json({
       communityId: cid,
       name: comm.data()?.name,
     })
   } catch (e) {
     console.error('auth login:', e)
-    return res.status(500).json({ error: e instanceof Error ? e.message : 'ログインに失敗しました' })
+    const msg = e instanceof Error ? e.message : 'ログインに失敗しました'
+    if (form) return redirectLoginError(res, msg, cid)
+    return res.status(500).json({ error: msg })
   }
 }

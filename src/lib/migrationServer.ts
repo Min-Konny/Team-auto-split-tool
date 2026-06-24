@@ -84,7 +84,6 @@ async function runDefaultMigrationAdmin(): Promise<{ migrated: boolean; memberCo
         roles: member.roles,
         mainRole: member.mainRole,
         stats: member.stats,
-        tags: member.tags ?? [],
       })
       ops++
       memberCount++
@@ -168,7 +167,6 @@ async function runDefaultMigrationClient(): Promise<{ migrated: boolean; memberC
         roles: member.roles,
         mainRole: member.mainRole,
         stats: member.stats,
-        tags: member.tags ?? [],
       })
       ops++
       memberCount++

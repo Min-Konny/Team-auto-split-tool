@@ -12,7 +12,6 @@ export interface Member {
   roles: RoleMap
   mainRole: GameRole
   stats: { wins: number; losses: number }
-  tags?: string[]
 }
 
 /** @deprecated 移行用。新規は Member を使用 */
@@ -24,6 +23,5 @@ export interface LegacyPlayer {
   mainRate: number
   subRate: number
   stats: { wins: number; losses: number }
-  tags?: string[]
   unwantedRoles?: GameRole[]
 }

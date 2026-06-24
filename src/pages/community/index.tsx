@@ -9,7 +9,7 @@ export default function CommunityIndexPage() {
   const router = useRouter()
 
   const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' })
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
     router.push('/community/join')
   }
 

@@ -10,21 +10,45 @@ export interface PasteLineResult {
   candidates?: Member[]
 }
 
-/** Discord のメンション・記号を除いて1行1名に分解 */
-export function parseDiscordLines(text: string): string[] {
-  return text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      let s = line.replace(/^@+/, '').trim()
-      s = s.replace(/<@!?\d+>/g, '').trim()
-      s = s.replace(/^[@#]+/, '').trim()
-      const dash = s.split(/\s*[—–-]\s+/)
-      if (dash.length > 1) s = dash[0].trim()
-      return s
-    })
-    .filter(Boolean)
+const LOBBY_JOIN_MARKER = 'がロビーに参加しました'
+
+/** LoL クライアントの不可視制御文字（コピー時に混入） */
+const INVISIBLE_CHARS = /[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g
+
+export function stripInvisibleChars(s: string): string {
+  return s.replace(INVISIBLE_CHARS, '').trim()
+}
+
+/** `⁦⁦こにー⁩ #⁦0329⁩⁩がロビーに参加しました。` → `こにー` */
+export function extractSummonerNameFromLobbyLine(line: string): string {
+  let s = stripInvisibleChars(line)
+  const idx = s.indexOf(LOBBY_JOIN_MARKER)
+  if (idx >= 0) {
+    s = s.slice(0, idx).trim()
+  }
+  s = stripInvisibleChars(s)
+  const hashIdx = s.indexOf('#')
+  if (hashIdx >= 0) {
+    s = s.slice(0, hashIdx).trim()
+  }
+  return stripInvisibleChars(s)
+}
+
+/** カスタム入室ログを1行1サモナー名に分解 */
+export function parseLobbyJoinLines(text: string): string[] {
+  const names: string[] = []
+  for (const line of text.split(/\r?\n/)) {
+    const trimmed = line.trim()
+    if (!trimmed) continue
+    if (trimmed.includes(LOBBY_JOIN_MARKER)) {
+      const name = extractSummonerNameFromLobbyLine(trimmed)
+      if (name) names.push(name)
+      continue
+    }
+    const plain = stripInvisibleChars(trimmed)
+    if (plain) names.push(plain)
+  }
+  return names
 }
 
 function normalize(s: string): string {

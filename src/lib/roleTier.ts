@@ -75,6 +75,5 @@ export function legacyToMember(id: string, p: LegacyPlayer): Member {
     roles,
     mainRole: p.mainRole,
     stats: p.stats || { wins: 0, losses: 0 },
-    tags: p.tags,
   }
 }

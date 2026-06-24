@@ -15,7 +15,6 @@ export function migratePlayerRates(oldPlayer: any): Player {
     mainRate,
     subRate,
     stats: oldPlayer.stats || { wins: 0, losses: 0 },
-    tags: oldPlayer.tags
   }
 }
 

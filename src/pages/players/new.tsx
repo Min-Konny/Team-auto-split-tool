@@ -9,7 +9,6 @@ import { useCommunity } from '@/lib/useCommunity'
 import { GameRole, RANK_RATES, Rank } from '@/types'
 import { RoleMap } from '@/types/member'
 
-const AVAILABLE_TAGS = ['249', 'SHIFT', 'きらくに', 'その他']
 const ROLES: GameRole[] = [GameRole.TOP, GameRole.JUNGLE, GameRole.MID, GameRole.ADC, GameRole.SUP]
 const ROLE_ICONS: Record<GameRole, string> = { TOP: '🗡', JUNGLE: '🌲', MID: '⚡', ADC: '🏹', SUP: '🛡' }
 
@@ -47,24 +46,20 @@ export default function NewPlayerPage() {
   const [nick, setNick] = useState('')
   const [roles, setRoles] = useState<RoleMap>(defaultRoleMap(GameRole.MID))
   const [rank, setRank] = useState<Rank>('GOLD')
-  const [tags, setTags] = useState<string[]>([])
-  const [errors, setErrors] = useState<{ name?: string; role?: string; tags?: string }>({})
+  const [errors, setErrors] = useState<{ name?: string; role?: string }>({})
   const [saved, setSaved] = useState(false)
   const router = useRouter()
 
   const mainRole = getMainRoleFromMap(roles)
-  const canSubmit = name.trim() && mainRole && tags.length > 0
-
-  const toggleTag = (t: string) => setTags((prev) => (prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]))
+  const canSubmit = name.trim() && mainRole
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!community) return
-    const nextErrors: { name?: string; role?: string; tags?: string } = {}
+    const nextErrors: { name?: string; role?: string } = {}
     if (!name.trim()) nextErrors.name = 'サモナーネームを入力してください'
     const roleErr = validateRoleMap(roles)
     if (roleErr) nextErrors.role = roleErr
-    if (tags.length === 0) nextErrors.tags = 'タグを1つ以上選択してください'
     setErrors(nextErrors)
     if (Object.keys(nextErrors).length > 0) return
 
@@ -78,7 +73,6 @@ export default function NewPlayerPage() {
       roles,
       mainRole: mr,
       stats: { wins: 0, losses: 0 },
-      tags,
     })
     setSaved(true)
     setTimeout(() => {
@@ -130,18 +124,6 @@ export default function NewPlayerPage() {
               </div>
             </section>
 
-            <section className="fsec">
-              <label className="fsec-lbl">タグ *</label>
-              <div className="chip-row">
-                {AVAILABLE_TAGS.map((t) => (
-                  <button key={t} type="button" className={`chip${tags.includes(t) ? ' on-blue' : ''}`} onClick={() => { toggleTag(t); setErrors((p) => ({ ...p, tags: undefined })) }}>
-                    {t}
-                  </button>
-                ))}
-              </div>
-              {errors.tags && <div className="err-msg">{errors.tags}</div>}
-            </section>
-
             <button className="submit-btn" type="submit" disabled={!canSubmit || !community}>登録する</button>
           </form>
         </section>
@@ -161,7 +143,6 @@ export default function NewPlayerPage() {
                     <div className="pv-rank" style={{ color: RANK_COLORS[getRankFromRate(rates.main)] }}>{getRankFromRate(rates.main)}</div>
                   </div>
                 </div>
-                {tags.length > 0 && <div className="pv-tags">{tags.map((t) => <span className="pv-tag" key={t}>{t}</span>)}</div>}
               </>
             ) : (
               <div className="pv-empty">入力するとここにプレビューされます</div>
@@ -221,8 +202,6 @@ export default function NewPlayerPage() {
         .pv-rate-k { font-family: 'JetBrains Mono'; font-size: 10px; letter-spacing: 0.1em; color: var(--fg-3); }
         .pv-rate-v { font-family: 'Space Grotesk'; font-size: 28px; font-weight: 600; letter-spacing: -0.03em; margin-top: 4px; }
         .pv-rank { font-family: 'JetBrains Mono'; font-size: 11px; margin-top: 2px; }
-        .pv-tags { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 14px; }
-        .pv-tag { font-family: 'JetBrains Mono'; font-size: 10px; padding: 3px 10px; border-radius: 999px; background: color-mix(in oklch, var(--blue) 16%, transparent); border: 1px solid var(--blue-d); color: var(--blue); }
         .pv-ng-chip { font-family: 'JetBrains Mono'; font-size: 10px; padding: 2px 8px; border-radius: 4px; background: color-mix(in oklch, var(--red) 13%, transparent); border: 1px solid var(--red-d); color: var(--red); }
         .pv-empty { color: var(--fg-3); font-family: 'JetBrains Mono'; font-size: 12px; text-align: center; padding: 24px 0; }
         .toast { position: fixed; bottom: 24px; right: 24px; z-index: 200; background: var(--bg-2); border: 1px solid var(--ok); border-radius: 11px; padding: 14px 18px; color: var(--ok); font-size: 13px; }

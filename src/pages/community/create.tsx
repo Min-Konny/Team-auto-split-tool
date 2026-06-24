@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import Head from 'next/head'
 import Link from 'next/link'
-import { useRouter } from 'next/router'
 import Header from '@/components/Header'
 
 export default function CommunityCreatePage() {
@@ -10,7 +9,6 @@ export default function CommunityCreatePage() {
   const [error, setError] = useState<string | null>(null)
   const [created, setCreated] = useState<{ id: string; name: string } | null>(null)
   const [busy, setBusy] = useState(false)
-  const router = useRouter()
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -20,10 +18,17 @@ export default function CommunityCreatePage() {
       const res = await fetch('/api/community/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ name, password }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '作成に失敗しました')
+      const me = await fetch('/api/community/me', { credentials: 'include' })
+      const meData = await me.json()
+      if (meData.community) {
+        window.location.href = '/team-maker'
+        return
+      }
       setCreated({ id: data.communityId, name: data.name })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'エラー')
@@ -53,7 +58,7 @@ export default function CommunityCreatePage() {
             </p>
             <p className="id-label">コミュニティ ID（メンバーに共有）</p>
             <code className="id-code">{created.id}</code>
-            <button type="button" onClick={() => router.push('/team-maker')}>
+            <button type="button" onClick={() => { window.location.href = '/team-maker' }}>
               チーム作成へ進む
             </button>
           </div>

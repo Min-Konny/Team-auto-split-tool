@@ -12,7 +12,7 @@ export function useCommunity() {
 
   const refresh = () => {
     setLoading(true)
-    fetch('/api/community/me')
+    fetch('/api/community/me', { credentials: 'include' })
       .then((r) => r.json())
       .then((d) => {
         setCommunity(d.community ?? null)

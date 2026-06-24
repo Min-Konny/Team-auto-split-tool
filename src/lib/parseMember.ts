@@ -41,6 +41,5 @@ export function parseMemberDoc(id: string, raw: Record<string, unknown>): Member
     roles,
     mainRole,
     stats: stats?.wins != null ? stats : { wins: 0, losses: 0 },
-    tags: Array.isArray(raw.tags) ? (raw.tags as string[]) : [],
   }
 }

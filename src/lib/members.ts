@@ -24,7 +24,6 @@ export async function addMember(communityId: string, data: Omit<Member, 'id'>): 
     roles: data.roles,
     mainRole,
     stats: data.stats,
-    tags: data.tags ?? [],
   })
   return ref.id
 }

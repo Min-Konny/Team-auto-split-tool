@@ -24,13 +24,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: 'コミュニティに参加してください' })
   }
 
-  const { memberId, name, nickname, elo, roles, tags } = req.body as {
+  const { memberId, name, nickname, elo, roles } = req.body as {
     memberId?: string
     name?: string
     nickname?: string
     elo?: number
     roles?: RoleMap
-    tags?: string[]
   }
 
   if (!memberId || !name?.trim() || typeof elo !== 'number' || !roles) {
@@ -47,7 +46,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     elo: Math.round(elo),
     roles: normalizedRoles,
     mainRole,
-    tags: Array.isArray(tags) ? tags : [],
   }
 
   try {

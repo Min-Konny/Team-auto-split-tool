@@ -38,7 +38,6 @@ export interface Player {
   mainRate: number
   subRate: number
   stats: { wins: number; losses: number }
-  tags?: string[]
   unwantedRoles?: GameRole[]
 }
 
