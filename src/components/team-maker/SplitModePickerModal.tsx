@@ -3,22 +3,28 @@ import { SplitCandidate, SplitMode } from '@/lib/teamBalancer'
 
 const MODE_META: Record<
   SplitMode,
-  { title: string; desc: string; accent: 'blue' | 'neutral' | 'red' }
+  { title: string; desc: string; accent: 'blue' | 'neutral' | 'red'; scoreLabel: string; scoreOf: (c: SplitCandidate) => string }
 > = {
-  party_balance: {
-    title: 'パーティー',
-    desc: '同じパーティのメンバーが片側に偏らないよう調整します。',
+  position_priority: {
+    title: 'ポジション優先',
+    desc: '◎（メインロール）をできるだけ多く割り当てます。得意レーンでプレイしやすい構成を目指します。',
     accent: 'blue',
+    scoreLabel: '◎ロール',
+    scoreOf: (c) => `${c.metrics.mainHits}/10`,
   },
-  rate_equal: {
-    title: 'レート均等',
-    desc: 'BLUE / RED の合計レート差が最小になる組み合わせを選びます。',
+  team_balance: {
+    title: 'チームバランス優先',
+    desc: 'BLUE / RED の合計レート差が最小になる組み合わせを選びます。勝率の偏りを抑えます。',
     accent: 'neutral',
+    scoreLabel: '合計差',
+    scoreOf: (c) => `${Math.round(c.metrics.totalDiff)} pt`,
   },
-  random: {
-    title: 'ランダム',
-    desc: 'バランスの良い候補の中からランダムに1パターンを選びます。',
+  lane_balance: {
+    title: 'ポジション間のレート差優先',
+    desc: 'TOP vs TOP など、同じレーン同士のレート差が最小になる組み合わせを選びます。レーン勝負を均等にします。',
     accent: 'red',
+    scoreLabel: 'レーン平均差',
+    scoreOf: (c) => `${Math.round(c.metrics.avgLaneDiff)} pt`,
   },
 }
 
@@ -73,8 +79,7 @@ export default function SplitModePickerModal({ candidates, open, onPick, onClose
                 <span className="mode-card-title">{meta.title}</span>
                 <span className="mode-card-desc">{meta.desc}</span>
                 <span className="mode-card-score">
-                  バランス <strong>{c.metrics.balanceScore}</strong>
-                  <span className="mode-card-sub">/ 100</span>
+                  {meta.scoreLabel} <strong>{meta.scoreOf(c)}</strong>
                 </span>
                 <span className="mode-card-cta">この方式で分ける →</span>
               </motion.button>

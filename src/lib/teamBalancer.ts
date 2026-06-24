@@ -5,7 +5,7 @@ import { hungarian } from '@/lib/hungarian'
 
 const ROLES: GameRole[] = [GameRole.TOP, GameRole.JUNGLE, GameRole.MID, GameRole.ADC, GameRole.SUP]
 
-export type SplitMode = 'party_balance' | 'rate_equal' | 'random'
+export type SplitMode = 'position_priority' | 'team_balance' | 'lane_balance'
 
 export interface TeamSlot {
   member: Member
@@ -126,14 +126,14 @@ interface ScoredSplit {
 
 function buildReasons(metrics: SplitMetrics, mode: SplitMode): string[] {
   const lines = [
-    `チーム合計差 ${metrics.totalDiff} pt`,
+    `チーム合計差 ${Math.round(metrics.totalDiff)} pt`,
     `レーン平均差 ${Math.round(metrics.avgLaneDiff)} pt`,
     `◎ロール ${metrics.mainHits}/10`,
     `バランス ${metrics.balanceScore}/100`,
   ]
-  if (mode === 'rate_equal') lines.unshift('レート均等優先')
-  if (mode === 'party_balance') lines.unshift('パーティーバランス優先')
-  if (mode === 'random') lines.unshift('ランダム（上位候補から抽選）')
+  if (mode === 'position_priority') lines.unshift('ポジション（◎ロール）優先')
+  if (mode === 'team_balance') lines.unshift('チーム合計レートのバランス優先')
+  if (mode === 'lane_balance') lines.unshift('レーンごとのレート差優先')
   return lines
 }
 
@@ -165,27 +165,38 @@ export function generateThreeCandidates(members: Member[]): SplitCandidate[] {
     return pickBest(sorted, used, index + 1)
   }
 
-  const byRate = [...scored].sort((a, b) => a.metrics.totalDiff - b.metrics.totalDiff)
-  const byParty = [...scored].sort((a, b) => a.metrics.partySpread - b.metrics.partySpread)
-  const byScore = [...scored].sort((a, b) => b.metrics.balanceScore - a.metrics.balanceScore)
+  const byPosition = [...scored].sort(
+    (a, b) =>
+      b.metrics.mainHits - a.metrics.mainHits ||
+      a.metrics.totalDiff - b.metrics.totalDiff ||
+      b.metrics.balanceScore - a.metrics.balanceScore
+  )
+  const byTeamBalance = [...scored].sort(
+    (a, b) =>
+      a.metrics.totalDiff - b.metrics.totalDiff ||
+      a.metrics.avgLaneDiff - b.metrics.avgLaneDiff ||
+      b.metrics.mainHits - a.metrics.mainHits
+  )
+  const byLaneBalance = [...scored].sort(
+    (a, b) =>
+      a.metrics.avgLaneDiff - b.metrics.avgLaneDiff ||
+      a.metrics.totalDiff - b.metrics.totalDiff ||
+      b.metrics.mainHits - a.metrics.mainHits
+  )
 
   const used = new Set<string>()
-  const pickRateEqual = pickBest(byRate, used)
-  used.add(splitKey(pickRateEqual))
+  const pickPosition = pickBest(byPosition, used)
+  used.add(splitKey(pickPosition))
 
-  const pickParty = pickBest(byParty, used)
-  used.add(splitKey(pickParty))
+  const pickTeamBalance = pickBest(byTeamBalance, used)
+  used.add(splitKey(pickTeamBalance))
 
-  const topByScore = byScore.slice(0, 12)
-  let pickRandom = topByScore[Math.floor(Math.random() * topByScore.length)] ?? byScore[0]
-  if (used.has(splitKey(pickRandom))) {
-    pickRandom = topByScore.find((s) => !used.has(splitKey(s))) ?? pickRandom
-  }
+  const pickLaneBalance = pickBest(byLaneBalance, used)
 
   const modes: { mode: SplitMode; pick: ScoredSplit }[] = [
-    { mode: 'party_balance', pick: pickParty },
-    { mode: 'rate_equal', pick: pickRateEqual },
-    { mode: 'random', pick: pickRandom },
+    { mode: 'position_priority', pick: pickPosition },
+    { mode: 'team_balance', pick: pickTeamBalance },
+    { mode: 'lane_balance', pick: pickLaneBalance },
   ]
 
   return modes.map(({ mode, pick }) => ({

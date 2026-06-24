@@ -16,9 +16,9 @@ const ROLES: GameRole[] = [GameRole.TOP, GameRole.JUNGLE, GameRole.MID, GameRole
 const LANE_DIFF_TOLERANCE = 500
 
 const MODE_LABEL: Record<SplitMode, string> = {
-  party_balance: 'パーティー',
-  rate_equal: 'レート均等',
-  random: 'ランダム',
+  position_priority: 'ポジション優先',
+  team_balance: 'チームバランス優先',
+  lane_balance: 'ポジション間のレート差優先',
 }
 
 const SWAP_HINT_KEY = 'team_maker_swap_hint_v1'
