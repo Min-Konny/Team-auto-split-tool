@@ -41,7 +41,7 @@ const getRankFromRate = (rate: number): Rank => {
 }
 
 export default function NewPlayerPage() {
-  const { community } = useCommunity()
+  const { community, loading } = useCommunity()
   const [name, setName] = useState('')
   const [nick, setNick] = useState('')
   const [roles, setRoles] = useState<RoleMap>(defaultRoleMap(GameRole.MID))
@@ -92,6 +92,16 @@ export default function NewPlayerPage() {
             <Link href="/players" className="back-link">← プレイヤー一覧へ</Link>
             <h1>プレイヤー登録</h1>
           </div>
+
+          {!loading && !community && (
+            <div className="login-banner">
+              コミュニティにログインしていません。
+              <Link href="/community/join">ログイン</Link>
+              または
+              <Link href="/community/create">新規作成</Link>
+              してください。
+            </div>
+          )}
 
           <form onSubmit={handleSubmit}>
             <section className="fsec">
@@ -158,6 +168,8 @@ export default function NewPlayerPage() {
         .form-wrap { display: flex; flex-direction: column; gap: 12px; }
         .page-hd h1 { font-family: 'Space Grotesk'; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin: 10px 0 4px; }
         .back-link { display: inline-flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono'; font-size: 11px; color: var(--fg-3); text-decoration: none; letter-spacing: 0.08em; }
+        .login-banner { padding: 14px 16px; border-radius: 11px; border: 1px solid var(--red-d); background: color-mix(in oklch, var(--red) 10%, transparent); color: var(--fg-1); font-size: 13px; line-height: 1.55; margin-bottom: 12px; }
+        .login-banner a { color: var(--blue); font-weight: 600; margin: 0 4px; }
         .fsec { background: var(--bg-1); border: 1px solid var(--line); border-radius: 13px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
         .fsec-lbl { font-family: 'JetBrains Mono'; font-size: 10px; letter-spacing: 0.14em; color: var(--fg-3); text-transform: uppercase; }
         .form-input { width: 100%; padding: 11px 14px; background: var(--bg-0); border: 1px solid var(--line); border-radius: 9px; color: var(--fg-0); font-size: 14px; outline: none; }

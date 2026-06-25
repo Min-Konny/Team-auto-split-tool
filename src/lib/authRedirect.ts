@@ -32,3 +32,19 @@ export function redirectLoginError(
   res.writeHead(302, { Location: `/community/join?${q.toString()}` })
   res.end()
 }
+
+export function redirectCreateSuccess(
+  res: NextApiResponse,
+  communityId: string,
+  name: string,
+  setCookie: string
+): void {
+  const q = new URLSearchParams({ success: '1', id: communityId, name })
+  redirectWithCookie(res, `/community/create?${q.toString()}`, setCookie)
+}
+
+export function redirectCreateError(res: NextApiResponse, message: string): void {
+  const q = new URLSearchParams({ error: message })
+  res.writeHead(302, { Location: `/community/create?${q.toString()}` })
+  res.end()
+}

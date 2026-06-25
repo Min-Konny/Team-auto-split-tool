@@ -138,6 +138,8 @@ export default function CommunityJoinPage() {
 
           コミュニティを選び、<strong>パスワード</strong>を入力してログインします。
 
+          自分で作ったコミュニティは<strong>「その他」</strong>に作成時の ID を入力してください。
+
         </p>
 
 

@@ -8,6 +8,8 @@ export default function CommunityIndexPage() {
   const { community, loading } = useCommunity()
   const router = useRouter()
 
+  const isPreset = community && ['249', 'kirakuni', 'shift', 'default'].includes(community.id)
+
   const logout = async () => {
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
     router.push('/community/join')
@@ -27,6 +29,11 @@ export default function CommunityIndexPage() {
             <p>
               <strong>{community.name}</strong> にログイン中
             </p>
+            {!isPreset && (
+              <p className="community-id">
+                コミュニティ ID: <code>{community.id}</code>
+              </p>
+            )}
             <button type="button" className="secondary" onClick={logout}>
               ログアウト
             </button>
@@ -54,6 +61,8 @@ const css = `
 .comm-page h1{font-family:'Space Grotesk';font-size:22px;margin:0 0 24px}
 .session-box{background:var(--bg-1);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:24px}
 .session-box p{margin:0 0 8px;font-size:14px}
+.community-id{margin:0 0 8px!important;font-size:12px;color:var(--fg-2);line-height:1.5}
+.community-id code{font-family:'JetBrains Mono';font-size:11px;word-break:break-all}
 .secondary{margin-top:12px;width:100%;padding:10px;border-radius:9px;border:1px solid var(--line);background:transparent;color:var(--fg-0);font-weight:600;cursor:pointer}
 .cards{display:flex;flex-direction:column;gap:12px}
 .card{display:block;padding:18px;border-radius:12px;border:1px solid var(--line);background:var(--bg-1);text-decoration:none;color:inherit}
