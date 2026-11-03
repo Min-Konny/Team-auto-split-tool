@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import Header from '@/components/Header'
+import positions from '@/lib/draftPositions.json'
 import { appendDraftChoice, champions, championsById, draftOrder, normalizeChampionSearch, patch, type DraftRoom, type Side } from '@/lib/draft'
 
 const portrait = (image: string) => 'https://ddragon.leagueoflegends.com/cdn/' + patch + '/img/champion/' + image
+
+const roleFilters = ['ALL', 'TOP', 'JG', 'MID', 'ADC', 'SUP'] as const
+type RoleFilter = typeof roleFilters[number]
 
 type Keys = Record<Side | 'HOST', string>
 
@@ -38,6 +42,8 @@ export default function DraftPage() {
   const [key, setKey] = useState('')
   const [selected, setSelected] = useState('')
   const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('ALL')
+  const poolScroll = useRef<HTMLDivElement>(null)
   const [status, setStatus] = useState('')
   const [shareFallback, setShareFallback] = useState('')
   const [busy, setBusy] = useState(false)
@@ -49,8 +55,13 @@ export default function DraftPage() {
   const used = new Set(activeRoom?.choices)
   const preview = selected && !used.has(selected) ? championsById.get(selected) : undefined
   const query = normalizeChampionSearch(search.trim())
-  const filtered = champions.filter((champion) =>
+  const roleChampions = roleFilter === 'ALL' ? champions : positions[roleFilter].flatMap((championId) => championsById.get(championId) ?? [])
+  const filtered = roleChampions.filter((champion) =>
     normalizeChampionSearch(champion.name).includes(query) || normalizeChampionSearch(champion.id).includes(query))
+
+  function resetPoolScroll() {
+    if (poolScroll.current) poolScroll.current.scrollTop = 0
+  }
 
   useEffect(() => {
     if (!id) return
@@ -239,7 +250,7 @@ export default function DraftPage() {
               <section className="draft-pool" aria-label="チャンピオン一覧">
                 {action ? <>
                   <div className="draft-pool-toolbar">
-                    <input aria-label="チャンピオン検索" placeholder="チャンピオン名で検索" value={search} onChange={(event) => setSearch(event.target.value)} />
+                    <input aria-label="チャンピオン検索" placeholder="チャンピオン名で検索" value={search} onChange={(event) => { setSearch(event.target.value); resetPoolScroll() }} />
                     {preview && <details className="draft-art">
                       <summary>イラスト</summary>
                       <figure className="draft-preview">
@@ -248,7 +259,11 @@ export default function DraftPage() {
                       </figure>
                     </details>}
                   </div>
-                  <div className="draft-pool-scroll" tabIndex={0} role="region" aria-label="チャンピオンをスクロール">
+                  <div className="draft-role-filters" role="group" aria-label="ロールで絞り込む">
+                    {roleFilters.map((role) => <button type="button" key={role} aria-pressed={roleFilter === role}
+                      onClick={() => { setRoleFilter(role); resetPoolScroll() }}>{role === 'ALL' ? 'すべて' : role}</button>)}
+                  </div>
+                  <div ref={poolScroll} className="draft-pool-scroll" tabIndex={0} role="region" aria-label="チャンピオンをスクロール">
                     <div className="draft-champions">
                       {filtered.map((champion) => <button type="button" key={champion.id} disabled={!canChoose || busy || used.has(champion.id)}
                         aria-pressed={selected === champion.id} onClick={() => setSelected(champion.id)}>
@@ -321,6 +336,9 @@ export default function DraftPage() {
         .draft-preview { position: absolute; z-index: 3; top: 100%; right: 5px; margin: 0; width: min(90%, 420px); background: #111621; border: 1px solid var(--gold); border-radius: 6px; overflow: hidden; }
         .draft-preview img { width: 100%; max-height: 37dvh; object-fit: cover; }
         .draft-preview figcaption { padding: 4px 8px; }
+        .draft-role-filters { display: flex; flex-wrap: wrap; gap: 4px; padding: 5px 7px; border-bottom: 1px solid var(--line); }
+        .draft-role-filters button { padding: 3px 7px; font-size: 10px; white-space: nowrap; }
+        .draft-role-filters button[aria-pressed=true] { background: var(--gold); color: #17131a; font-weight: 800; }
         .draft-pool-scroll { min-height: 0; overflow-y: auto; padding: 7px; }
         .draft-champions { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 5px; }
         .draft-champions button { display: grid; justify-items: center; min-width: 0; padding: 2px; gap: 2px; font-size: 10px; }

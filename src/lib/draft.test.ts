@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import positions from './draftPositions.json'
 import { it } from 'node:test'
 import { appendDraftChoice, champions, draftOrder, normalizeChampionSearch } from './draft'
 
@@ -35,4 +36,10 @@ it('matches hiragana, full-width and half-width katakana, and English IDs', () =
   assert.equal(normalizeChampionSearch('Ａｈｒｉ'), 'ahri')
   assert.equal(normalizeChampionSearch('りーしん'), normalizeChampionSearch('リー・シン'))
   assert.equal(normalizeChampionSearch('かいさ'), normalizeChampionSearch('カイ＝サ'))
+})
+
+it('covers the entire draft catalog and allows flex picks in multiple roles', () => {
+  assert.deepEqual(new Set(Object.values(positions).flat()), new Set(champions.map(({ id }) => id)))
+  assert(positions.MID.includes('Lux'))
+  assert(positions.SUP.includes('Lux'))
 })
