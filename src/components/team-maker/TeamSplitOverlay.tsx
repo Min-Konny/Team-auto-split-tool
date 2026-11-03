@@ -304,7 +304,7 @@ export default function TeamSplitOverlay({
           </div>
         </motion.div>
 
-        <div className="ov-body">
+        <div className="ov-body" role="region" aria-label="チーム編成とレート" tabIndex={0}>
           {result && (
             <section ref={ratingSection} className="match-rating" aria-label="試合のレート">
               <h3><span className="rating-kicker">MATCH COMPLETE</span>レート反映済み</h3>
@@ -524,6 +524,40 @@ export default function TeamSplitOverlay({
         .ov-title > span, .rating-kicker { display: block; color: var(--fg-2); font: 600 9px 'JetBrains Mono', monospace; letter-spacing: .16em; }
         .ov-title h2 { margin-top: 3px; font-size: clamp(17px, 3vw, 24px); }
         .ov-body { min-height: 0; scrollbar-color: var(--line-2) transparent; }
+        .ov-body:focus-visible { outline: 2px solid var(--blue); outline-offset: -2px; }
+        .ov-body > * { flex-shrink: 0; }
+        @media (max-height: 900px) {
+          .overlay .ov-hd { padding-block: 7px; }
+          .overlay .cand-tabs-wrap { padding-top: 6px; }
+          .overlay .cand-tabs-label { margin-bottom: 4px; }
+          .overlay .cand-tabs { padding-bottom: 6px; }
+          .overlay .cand-reasons { padding-block: 5px; }
+          .overlay .ov-stat-side { padding-block: 6px; }
+          .overlay .sv { font-size: 19px; }
+          .overlay .ov-body { gap: 5px; padding-block: 6px; }
+          .overlay .rr-card { padding-block: 5px; }
+          .overlay .rr-rate { font-size: 17px; }
+          .overlay .rr-line2 { margin-top: 0; }
+          .overlay .rr-center { gap: 3px; }
+          .overlay .rr-role-btn, .overlay .rr-diff { padding-block: 2px; }
+          .overlay .swap-hint-banner { padding-block: 5px; margin-bottom: 0; align-items: center; }
+          .overlay .swap-hint-text strong { font-size: 12px; margin-bottom: 1px; }
+          .overlay .swap-hint-ok { padding-block: 5px; }
+          .overlay .result-controls .performance-panel { margin-block: 5px; }
+          .overlay .result-controls .result-bar { padding-block: 6px; }
+          .overlay .result-controls .win-btn, .overlay .result-controls .draft-btn { padding-block: 8px; }
+        }
+        @media (min-width: 900px) and (max-height: 900px) {
+          .overlay .rr-info { display: flex; align-items: center; gap: 10px; }
+          .overlay .red-card .rr-info { flex-direction: row-reverse; }
+          .overlay .rr-line1 { min-width: 0; }
+          .overlay .rr-line2 { flex-shrink: 0; }
+          .overlay .rr-sub { display: none; }
+        }
+        @media (max-height: 620px) {
+          .overlay .overlay-content { overflow-y: auto; }
+          .overlay .ov-body { flex: 1 0 auto; overflow: visible; }
+        }
         .rr-card.blue-card { background: linear-gradient(110deg, color-mix(in srgb, var(--blue) 12%, var(--bg-1)), var(--bg-1) 75%); }
         .rr-card.red-card { background: linear-gradient(250deg, color-mix(in srgb, var(--red) 12%, var(--bg-1)), var(--bg-1) 75%); }
         .win-btn.blue:not(:disabled) { border-color: var(--blue-d); background: color-mix(in srgb, var(--blue) 13%, var(--bg-1)); }
