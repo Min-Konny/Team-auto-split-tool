@@ -15,6 +15,20 @@ async function requestRoom(path: string, body?: object) {
   return { response, ...data } as { response: Response; room?: DraftRoom; keys?: Keys; error?: string }
 }
 
+const turnSeconds = 30
+
+function DraftTimer({ startedAt }: { startedAt: number }) {
+  const readTime = () => Math.max(0, turnSeconds - Math.floor((Date.now() - startedAt) / 1000))
+  const [seconds, setSeconds] = useState(readTime)
+  useEffect(() => {
+    const timer = window.setInterval(() => setSeconds(readTime()), 250)
+    return () => window.clearInterval(timer)
+  }, [startedAt])
+  return <span className={seconds === 0 ? 'draft-timer overtime' : 'draft-timer'} role="timer" aria-label="手番の目安">
+    {Math.min(turnSeconds, seconds)}秒{seconds === 0 ? ' · 確定待ち' : ''}
+  </span>
+}
+
 export default function DraftPage() {
   const router = useRouter()
   const id = typeof router.query.room === 'string' ? router.query.room : ''
@@ -31,6 +45,8 @@ export default function DraftPage() {
   const activeRoom = room?.id === (id || 'local') ? room : undefined
   const turn = activeRoom?.choices.length ?? 0
   const action = activeRoom ? draftOrder[turn] : undefined
+  const previousAction = turn > 0 ? draftOrder[turn - 1] : undefined
+  const previousChoice = activeRoom?.choices[turn - 1]
   const canChoose = action && (seat === 'HOST' || seat === action.side)
   const used = new Set(activeRoom?.choices)
   const preview = selected && !used.has(selected) ? championsById.get(selected) : undefined
@@ -114,7 +130,7 @@ export default function DraftPage() {
     if (!activeRoom || !canChoose || pending.current) return
     if (!appendDraftChoice(activeRoom.choices, turn, seat!, champion)) return
     if (!id) {
-      setRoom({ ...activeRoom, choices: [...activeRoom.choices, champion] })
+      setRoom({ ...activeRoom, choices: [...activeRoom.choices, champion], turnStartedAt: Date.now() })
       setSelected('')
       return
     }
@@ -162,10 +178,29 @@ export default function DraftPage() {
     ].join('\n'), true)
   }
 
+  const board = activeRoom && (
+          <div className="draft-sides">
+            {(['BLUE', 'RED'] as const).map((side) => <section className={'draft-side ' + side.toLowerCase()} key={side} aria-label={side}>
+              <h2>{side} SIDE</h2>
+              {(['BAN', 'PICK'] as const).map((kind) => <div className="draft-line" key={kind}>
+                <b>{kind}</b>
+                {draftOrder.map((slot, index) => ({ slot, index })).filter(({ slot }) => slot.side === side && slot.kind === kind).map(({ index }) => {
+                  const choice = activeRoom.choices[index]
+                  const champion = choice ? championsById.get(choice) : undefined
+                  return <span className="draft-slot" key={index} data-active={index === turn}>
+                    {champion && <img src={portrait(champion.image)} alt="" width="24" height="24" />}
+                    {champion?.name ?? (choice === null ? 'なし' : '—')}
+                  </span>
+                })}
+              </div>)}
+            </section>)}
+          </div>
+  )
+
   return (
     <>
       <Header />
-      <main className={canChoose ? "draft-page has-confirm-bar" : "draft-page"}>
+      <main className={action ? "draft-page has-confirm-bar" : "draft-page"}>
         <header className="draft-head">
           <p>CUSTOM 5V5 · PATCH {patch}</p>
           <h1>BAN / PICK</h1>
@@ -176,7 +211,7 @@ export default function DraftPage() {
           <button disabled={busy} onClick={() => {
             setStatus('')
             setSeat('HOST')
-            setRoom({ id: 'local', choices: [], expiresAt: 0 })
+            setRoom({ id: 'local', choices: [], expiresAt: 0, turnStartedAt: Date.now() })
           }}>この端末だけで試す</button>
         </div>}
         {!activeRoom && id && !status && <p role="status">ルームを読み込み中…</p>}
@@ -197,22 +232,7 @@ export default function DraftPage() {
           <div className="draft-turn" aria-live="polite">
             {action ? <><b>{action.side} {action.kind}</b> · {turn + 1}/{draftOrder.length} {canChoose ? '・操作できます' : '・選択待ち'}</> : <b>ドラフト完了</b>}
           </div>
-          <div className="draft-sides">
-            {(['BLUE', 'RED'] as const).map((side) => <section className={'draft-side ' + side.toLowerCase()} key={side} aria-label={side}>
-              <h2>{side} SIDE</h2>
-              {(['BAN', 'PICK'] as const).map((kind) => <div className="draft-line" key={kind}>
-                <b>{kind}</b>
-                {draftOrder.map((slot, index) => ({ slot, index })).filter(({ slot }) => slot.side === side && slot.kind === kind).map(({ index }) => {
-                  const choice = activeRoom.choices[index]
-                  const champion = choice ? championsById.get(choice) : undefined
-                  return <span className="draft-slot" key={index} data-active={index === turn}>
-                    {champion && <img src={portrait(champion.image)} alt="" width="24" height="24" />}
-                    {champion?.name ?? (choice === null ? 'なし' : '—')}
-                  </span>
-                })}
-              </div>)}
-            </section>)}
-          </div>
+          {board}
           {action && <>
             {preview && <figure className="draft-preview">
               <img src={'https://ddragon.leagueoflegends.com/cdn/img/champion/splash/' + preview.id + '_0.jpg'} alt="" />
@@ -229,18 +249,26 @@ export default function DraftPage() {
               </button>)}
               {!filtered.length && <p>該当するチャンピオンはいません。</p>}
             </div>
-            {canChoose && <div className="draft-confirm-bar">
+            <div className="draft-confirm-bar">
+              <details className="draft-board-float">
+                <summary>盤面を見る <span>{turn}/{draftOrder.length} 確定</span>
+                  {previousAction && <span>直前 {previousAction.side} {previousAction.kind} · {previousChoice ? championsById.get(previousChoice)?.name : 'なし'}</span>}
+                </summary>
+                {board}
+              </details>
               <div className="draft-confirm-inner">
                 <div className="draft-confirm-choice" aria-live="polite">
                   {preview && <img src={portrait(preview.image)} alt="" width="32" height="32" />}
-                  <span><small>{action.side} {action.kind} · {turn + 1}/{draftOrder.length}</small><b>{preview?.name ?? 'チャンピオンを選択'}</b></span>
+                  <span><small>{action.side} {action.kind} · {turn + 1}/{draftOrder.length}</small>
+                    <b>{canChoose ? preview?.name ?? 'チャンピオンを選択' : '選択待ち'}</b></span>
                 </div>
-                {action.kind === 'BAN' && <button type="button" disabled={busy} onClick={() => confirm(null)}>BANなし</button>}
-                <button type="button" className="draft-confirm" disabled={busy || !preview} onClick={() => confirm(selected)}>
+                {activeRoom.turnStartedAt !== undefined && <DraftTimer key={activeRoom.turnStartedAt} startedAt={activeRoom.turnStartedAt} />}
+                {canChoose && action.kind === 'BAN' && <button type="button" disabled={busy} onClick={() => confirm(null)}>BANなし</button>}
+                {canChoose && <button type="button" className="draft-confirm" disabled={busy || !preview} onClick={() => confirm(selected)}>
                   {busy ? '確定中…' : action.kind + '確定'}
-                </button>
+                </button>}
               </div>
-            </div>}
+            </div>
           </>}
         </>}
         <p className="draft-credit">LoL Team Maker isn’t endorsed by Riot Games and doesn’t reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.</p>
@@ -274,11 +302,17 @@ export default function DraftPage() {
         .draft-line [data-active=true] { border-color: var(--gold); }
         .draft-champions { display: grid; grid-template-columns: repeat(auto-fill,minmax(85px,1fr)); gap: 6px; }
         .draft-champions button { display: grid; justify-items: center; gap: 3px; font-size: 11px; }
-        .draft-page.has-confirm-bar { padding-bottom: calc(106px + env(safe-area-inset-bottom)); }
+        .draft-page.has-confirm-bar { padding-bottom: calc(145px + env(safe-area-inset-bottom)); }
         .draft-confirm-bar {
           position: fixed; inset: auto 0 0; z-index: 60; background: var(--bg-0); border-top: 1px solid var(--line-2);
           padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -8px 24px #0004;
         }
+        .draft-board-float { max-width: 1200px; margin: auto; padding-inline: clamp(12px,3vw,36px); }
+        .draft-board-float summary { padding-block: 7px; cursor: pointer; font-size: 12px; color: var(--fg-0); }
+        .draft-board-float summary span { margin-left: 8px; color: var(--fg-1); }
+        .draft-board-float[open] { max-height: 38dvh; overflow-y: auto; }
+        :global(.draft-timer) { padding: 5px 8px; border: 1px solid var(--line-2); border-radius: 6px; color: var(--gold); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        :global(.draft-timer.overtime) { color: var(--red); }
         .draft-confirm-inner {
           max-width: 1200px; margin: auto; padding: 8px clamp(12px,3vw,36px);
           display: flex; align-items: center; flex-wrap: wrap; gap: 8px;

@@ -2,7 +2,7 @@ import catalog from './draftChampions.json'
 
 export type Side = 'BLUE' | 'RED'
 export type DraftAction = { side: Side; kind: 'BAN' | 'PICK' }
-export type DraftRoom = { id: string; choices: (string | null)[]; expiresAt: number }
+export type DraftRoom = { id: string; choices: (string | null)[]; expiresAt: number; turnStartedAt?: number }
 
 export const champions = catalog.champions
 export const patch = catalog.version
@@ -28,6 +28,6 @@ export function appendDraftChoice(
 }
 
 export function normalizeChampionSearch(value: string): string {
-  return value.normalize('NFKC').toLowerCase().replace(/[ァ-ヶ]/g, (kana) =>
+  return value.normalize('NFKC').toLowerCase().replace(/[・=\s]/g, '').replace(/[ァ-ヶ]/g, (kana) =>
     String.fromCharCode(kana.charCodeAt(0) - 0x60))
 }

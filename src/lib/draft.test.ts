@@ -33,4 +33,6 @@ it('matches hiragana, full-width and half-width katakana, and English IDs', () =
   assert.equal(normalizeChampionSearch('あーり'), normalizeChampionSearch('アーリ'))
   assert.equal(normalizeChampionSearch('ｳﾞｪｲﾝ'), normalizeChampionSearch('ゔぇいん'))
   assert.equal(normalizeChampionSearch('Ａｈｒｉ'), 'ahri')
+  assert.equal(normalizeChampionSearch('りーしん'), normalizeChampionSearch('リー・シン'))
+  assert.equal(normalizeChampionSearch('かいさ'), normalizeChampionSearch('カイ＝サ'))
 })

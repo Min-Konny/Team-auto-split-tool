@@ -11,7 +11,9 @@ const lifetime = 4 * 60 * 60 * 1000
 const roomId = /^[a-f0-9-]{36}$/
 const hash = (key: string) => createHash('sha256').update(key).digest('hex')
 const accessKey = () => randomBytes(24).toString('base64url')
-const publicRoom = (id: string, { choices, expiresAt }: StoredRoom): DraftRoom => ({ id, choices, expiresAt })
+const publicRoom = (id: string, { choices, expiresAt, turnStartedAt }: StoredRoom): DraftRoom => ({
+  id, choices, expiresAt, turnStartedAt: turnStartedAt ?? expiresAt - lifetime,
+})
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   res.setHeader('Cache-Control', 'no-store')
@@ -26,8 +28,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method === 'POST' && id === undefined) {
       if (!getSessionFromRequest(req)) return res.status(401).json({ error: 'コミュニティに参加してから作成してください' })
       const keys = { BLUE: accessKey(), RED: accessKey(), HOST: accessKey() }
+      const turnStartedAt = Date.now()
       const room: StoredRoom = {
-        choices: [], expiresAt: Date.now() + lifetime,
+        choices: [], expiresAt: turnStartedAt + lifetime, turnStartedAt,
         keys: { BLUE: hash(keys.BLUE), RED: hash(keys.RED), HOST: hash(keys.HOST) },
       }
       const ref = getAdminFirestore().collection('draftRooms').doc(randomUUID())
@@ -54,8 +57,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!seat) return { status: 403, error: 'このルームを操作できるリンクを開いてください' }
       const choices = appendDraftChoice(room.choices, turn, seat, champion)
       if (!choices) return { status: 409, error: '手番が進んだか、このチャンピオンは選択できません', room: publicRoom(id, room) }
-      tx.update(ref, { choices })
-      return { status: 200, room: publicRoom(id, { ...room, choices }) }
+      const turnStartedAt = Date.now()
+      tx.update(ref, { choices, turnStartedAt })
+      return { status: 200, room: publicRoom(id, { ...room, choices, turnStartedAt }) }
     })
     const { status, ...body } = reply
     return res.status(status).json(body)
