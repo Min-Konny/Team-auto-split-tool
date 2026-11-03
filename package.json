@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "tsx --test src/lib/elo.test.ts src/lib/lobbyPaste.test.ts src/lib/teamClipboard.test.ts",
+    "test": "tsx --test src/lib/elo.test.ts src/lib/lobbyPaste.test.ts src/lib/teamClipboard.test.ts src/lib/draft.test.ts",
     "migrate:ahri-tags": "node scripts/replace-tags-ahri.mjs"
   },
   "dependencies": {

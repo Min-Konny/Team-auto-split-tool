@@ -508,8 +508,8 @@ export default function TeamSplitOverlay({
             >
               {registering ? '登録中…' : result === 'RED' ? '✓ RED WIN' : 'RED WIN'}
             </motion.button>
-            <a className="draft-btn" href="https://draftlol.dawe.gg/" target="_blank" rel="noopener noreferrer">
-              Draft Tool
+            <a className="draft-btn" href="/draft" target="_blank" rel="noopener noreferrer">
+              BAN / PICK
             </a>
           </div>
         </div>
