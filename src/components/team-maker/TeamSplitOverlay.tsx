@@ -77,7 +77,6 @@ export default function TeamSplitOverlay({
 }: Props) {
   const reduced = useReducedMotion()
   const [showSwapHint, setShowSwapHint] = useState(false)
-  const [showPerformance, setShowPerformance] = useState(false)
   const ratingSection = useRef<HTMLElement>(null)
   const [copied, setCopied] = useState(false)
   const activeMetrics = candidates[activeCandidate]?.metrics
@@ -276,61 +275,30 @@ export default function TeamSplitOverlay({
         </motion.div>
 
         <div className="ov-body">
-          <section ref={ratingSection} className="match-rating" aria-label="試合のレート">
-            {result ? <h3><span className="rating-kicker">MATCH COMPLETE</span>レート反映済み</h3> : (
-              <button type="button" className="performance-toggle" aria-expanded={showPerformance} onClick={() => setShowPerformance((open) => !open)}>
-                個人補正（任意）{performance.mvpId || performance.penaltyId ? ' · 選択済み' : ''}
-              </button>
-            )}
-            {result ? (
-              <div className="rating-grid" role="status">
-                {(['blue', 'red'] as const).map((side) => (
-                  <div key={side} className={'rating-side ' + side}>
-                    <h4>{side.toUpperCase()}</h4>
-                    {teams[side].map(({ member }) => {
-                      const change = eloChanges.find((entry) => entry.memberId === member.id)
-                      if (!change) return null
-                      return (
-                        <div className="rating-row" key={member.id}>
-                          <span>{member.nickname || member.name}
-                            {change.performance && <small>{change.performance === 'MVP' ? 'MVP' : '下方補正'} {change.performanceDelta! > 0 ? '+' : ''}{change.performanceDelta}</small>}
-                          </span>
-                          <span>{change.before} → {change.after} <strong style={{ color: change.delta < 0 ? 'var(--red)' : 'var(--ok)' }}>({change.delta > 0 ? '+' : ''}{change.delta})</strong></span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ))}
-              </div>
-            ) : showPerformance && (
-              <>
-                <p>突出したプレイヤーがいる試合だけ選択してください。勝敗ボタンでまとめて反映します。</p>
-                <div className="rating-grid">
-                  {(['mvpId', 'penaltyId'] as const).map((field) => (
-                    <label key={field}>
-                      <span>{field === 'mvpId' ? 'MVP +' : '下方補正 −'}{PERFORMANCE_POINTS}</span>
-                      <select
-                        value={performance[field] ?? ''}
-                        disabled={registering}
-                        onChange={(event) => onPerformance({ ...performance, [field]: event.target.value || undefined })}
-                      >
-                        <option value="">指定なし</option>
-                        {(['blue', 'red'] as const).map((side) => (
-                          <optgroup key={side} label={side.toUpperCase()}>
-                            {teams[side].map(({ member }) => (
-                              <option key={member.id} value={member.id} disabled={member.id === performance[field === 'mvpId' ? 'penaltyId' : 'mvpId']}>
-                                {member.nickname || member.name}
-                              </option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </select>
-                    </label>
-                  ))}
+          {result && (
+            <section ref={ratingSection} className="match-rating" aria-label="試合のレート">
+              <h3><span className="rating-kicker">MATCH COMPLETE</span>レート反映済み</h3>
+            <div className="rating-grid" role="status">
+              {(['blue', 'red'] as const).map((side) => (
+                <div key={side} className={'rating-side ' + side}>
+                  <h4>{side.toUpperCase()}</h4>
+                  {teams[side].map(({ member }) => {
+                    const change = eloChanges.find((entry) => entry.memberId === member.id)
+                    if (!change) return null
+                    return (
+                      <div className="rating-row" key={member.id}>
+                        <span>{member.nickname || member.name}
+                          {change.performance && <small>{change.performance === 'MVP' ? 'MVP' : '下方補正'} {change.performanceDelta! > 0 ? '+' : ''}{change.performanceDelta}</small>}
+                        </span>
+                        <span>{change.before} → {change.after} <strong style={{ color: change.delta < 0 ? 'var(--red)' : 'var(--ok)' }}>({change.delta > 0 ? '+' : ''}{change.delta})</strong></span>
+                      </div>
+                    )
+                  })}
                 </div>
-              </>
-            )}
-          </section>
+              ))}
+            </div>
+            </section>
+          )}
           <AnimatePresence>
             {showSwapHint && !swapSource && !shuffling && (
               <motion.div
@@ -445,34 +413,64 @@ export default function TeamSplitOverlay({
           })}
 
         </div>
-        <div className="result-bar">
-          <span className="res-lbl">{result ? 'RESULT SAVED' : '勝利チームを選択'}</span>
-          {registerError && <span role="alert" className="reg-error">{registerError}</span>}
-          <motion.button
-            type="button"
-            className={`win-btn blue ${result === 'BLUE' ? 'won-blue' : ''}`}
-            onClick={() => onRegister('BLUE')}
-            disabled={registering || result !== null}
-            whileTap={reduced ? undefined : { scale: 0.98 }}
-            animate={result === 'BLUE' && !reduced ? { scale: [1, 1.04, 1] } : undefined}
-            transition={{ duration: 0.35 }}
-          >
-            {registering ? '登録中…' : result === 'BLUE' ? '✓ BLUE WIN' : 'BLUE WIN'}
-          </motion.button>
-          <motion.button
-            type="button"
-            className={`win-btn red ${result === 'RED' ? 'won-red' : ''}`}
-            onClick={() => onRegister('RED')}
-            disabled={registering || result !== null}
-            whileTap={reduced ? undefined : { scale: 0.98 }}
-            animate={result === 'RED' && !reduced ? { scale: [1, 1.04, 1] } : undefined}
-            transition={{ duration: 0.35 }}
-          >
-            {registering ? '登録中…' : result === 'RED' ? '✓ RED WIN' : 'RED WIN'}
-          </motion.button>
-          <a className="draft-btn" href="https://draftlol.dawe.gg/" target="_blank" rel="noopener noreferrer">
-            Draft Tool
-          </a>
+        <div className="result-controls">
+          {!result && (
+            <fieldset className="performance-panel">
+              <legend>個人補正 <small>任意</small></legend>
+              <div className="rating-grid result-performance">
+                {(['mvpId', 'penaltyId'] as const).map((field) => (
+                  <label key={field}>
+                    <span>{field === 'mvpId' ? 'MVP +' : '下方補正 −'}{PERFORMANCE_POINTS}</span>
+                    <select
+                      value={performance[field] ?? ''}
+                      disabled={registering}
+                      onChange={(event) => onPerformance({ ...performance, [field]: event.target.value || undefined })}
+                    >
+                      <option value="">指定なし</option>
+                      {(['blue', 'red'] as const).map((side) => (
+                        <optgroup key={side} label={side.toUpperCase()}>
+                          {teams[side].map(({ member }) => (
+                            <option key={member.id} value={member.id} disabled={member.id === performance[field === 'mvpId' ? 'penaltyId' : 'mvpId']}>
+                              {member.nickname || member.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
+          <div className="result-bar">
+            <span className="res-lbl">{result ? 'RESULT SAVED' : '勝利チームを選択'}</span>
+            {registerError && <span role="alert" className="reg-error">{registerError}</span>}
+            <motion.button
+              type="button"
+              className={`win-btn blue ${result === 'BLUE' ? 'won-blue' : ''}`}
+              onClick={() => onRegister('BLUE')}
+              disabled={registering || result !== null}
+              whileTap={reduced ? undefined : { scale: 0.98 }}
+              animate={result === 'BLUE' && !reduced ? { scale: [1, 1.04, 1] } : undefined}
+              transition={{ duration: 0.35 }}
+            >
+              {registering ? '登録中…' : result === 'BLUE' ? '✓ BLUE WIN' : 'BLUE WIN'}
+            </motion.button>
+            <motion.button
+              type="button"
+              className={`win-btn red ${result === 'RED' ? 'won-red' : ''}`}
+              onClick={() => onRegister('RED')}
+              disabled={registering || result !== null}
+              whileTap={reduced ? undefined : { scale: 0.98 }}
+              animate={result === 'RED' && !reduced ? { scale: [1, 1.04, 1] } : undefined}
+              transition={{ duration: 0.35 }}
+            >
+              {registering ? '登録中…' : result === 'RED' ? '✓ RED WIN' : 'RED WIN'}
+            </motion.button>
+            <a className="draft-btn" href="https://draftlol.dawe.gg/" target="_blank" rel="noopener noreferrer">
+              Draft Tool
+            </a>
+          </div>
         </div>
       </div>
 
@@ -484,7 +482,7 @@ export default function TeamSplitOverlay({
         .ov-hd, .result-bar { background: color-mix(in srgb, var(--bg-0) 90%, transparent); }
         .ov-title > span, .rating-kicker { display: block; color: var(--fg-2); font: 600 9px 'JetBrains Mono', monospace; letter-spacing: .16em; }
         .ov-title h2 { margin-top: 3px; font-size: clamp(17px, 3vw, 24px); }
-        .ov-body { scrollbar-color: var(--line-2) transparent; }
+        .ov-body { min-height: 0; scrollbar-color: var(--line-2) transparent; }
         .rr-card.blue-card { background: linear-gradient(110deg, color-mix(in srgb, var(--blue) 12%, var(--bg-1)), var(--bg-1) 75%); }
         .rr-card.red-card { background: linear-gradient(250deg, color-mix(in srgb, var(--red) 12%, var(--bg-1)), var(--bg-1) 75%); }
         .win-btn.blue:not(:disabled) { border-color: var(--blue-d); background: color-mix(in srgb, var(--blue) 13%, var(--bg-1)); }
@@ -496,7 +494,12 @@ export default function TeamSplitOverlay({
         .rating-side h4 { color: var(--side-color); font: 700 11px 'JetBrains Mono', monospace; letter-spacing: .13em; }
         .rating-kicker { margin-bottom: 5px; color: var(--ok); }
         .match-rating { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-1); }
-        .performance-toggle { min-height: 36px; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--line-2); font-size: 13px; }
+        .result-controls { flex-shrink: 0; border-top: 1px solid var(--line); background: var(--bg-0); }
+        .performance-panel { max-width: 720px; min-inline-size: 0; border: 0; margin: 8px 28px 10px; padding: 0; }
+        .performance-panel legend { padding: 0; margin-bottom: 4px; font-size: 13px; font-weight: 700; }
+        .performance-panel small { margin-left: 4px; color: var(--fg-2); font-weight: 400; }
+        .result-performance { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        @media (max-width: 640px) { .performance-panel { margin-inline: 12px; } }
         .match-rating h3 { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
         .match-rating p { color: var(--fg-2); font-size: 12px; margin: 5px 0 10px; }
         .rating-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 20px; }
@@ -506,7 +509,7 @@ export default function TeamSplitOverlay({
         .rating-row > span:last-child { white-space: nowrap; font-variant-numeric: tabular-nums; }
         .rating-row > span:first-child { overflow-wrap: anywhere; }
         .rating-row small { display: block; color: var(--fg-2); }
-        @media (max-width: 600px) { .rating-grid { grid-template-columns: minmax(0, 1fr); } }
+        @media (max-width: 600px) { .rating-grid:not(.result-performance) { grid-template-columns: minmax(0, 1fr); } }
       `}</style>
       <style dangerouslySetInnerHTML={{ __html: overlayAnimCss }} />
     </motion.div>

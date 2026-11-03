@@ -1,427 +1,144 @@
-import dynamic from 'next/dynamic'
-import { motion, useReducedMotion } from 'framer-motion'
+import Link from 'next/link'
+import { useReducedMotion } from 'framer-motion'
 import Header from '@/components/Header'
-import ActionCard, { HeroParallax } from '@/components/home/ActionCard'
-import CountUp from '@/components/home/CountUp'
-
-const HeroVisual = dynamic(() => import('@/components/home/HeroVisual'), { ssr: false })
+import ActionCard from '@/components/home/ActionCard'
 
 const actions = [
-  {
-    href: '/team-maker',
-    num: '01 / PRIMARY',
-    title: 'チーム\n作成',
-    desc: '10人を選択し、レートと希望ロールから最適なチームを自動生成します。',
-    cta: 'START SPLIT',
-    cls: 'primary',
-  },
-  {
-    href: '/players',
-    num: '02 / ROSTER',
-    title: 'プレイヤー\nリスト',
-    desc: '登録済みプレイヤーの一覧と戦績、レートを確認できます。',
-    cta: 'VIEW',
-    cls: 'players',
-  },
-  {
-    href: '/players/new',
-    num: '03 / RECRUIT',
-    title: 'プレイヤー\n登録',
-    desc: '新しいプレイヤーを名前・ロール・ランクで追加します。',
-    cta: 'ADD',
-    cls: 'new',
-  },
-  {
-    href: '/matches',
-    num: '04 / HISTORY',
-    title: '試合\n履歴',
-    desc: '過去の対戦記録と勝敗、レート変動を振り返ります。',
-    cta: 'REVIEW',
-    cls: 'match',
-  },
+  { href: '/players', num: '01 / ROSTER', title: 'プレイヤー一覧', desc: 'メンバーのレート、得意ロール、戦績をチェック。', cta: 'VIEW ROSTER', cls: 'players' },
+  { href: '/players/new', num: '02 / RECRUIT', title: 'プレイヤー登録', desc: '新しい仲間を登録して、次のカスタムへ。', cta: 'ADD PLAYER', cls: 'new' },
+  { href: '/matches', num: '03 / ARCHIVE', title: '試合履歴', desc: '勝敗とレート変動、MVPなどの個人補正を振り返る。', cta: 'MATCH HISTORY', cls: 'match' },
 ]
 
-const ease = [0.22, 1, 0.36, 1] as const
+const lanes = 'M96 308 L96 131 Q96 94 134 94 H314 M96 308 H268 Q314 308 314 267 V94 M96 308 L314 94'
+const blueNodes = [[96, 241], [96, 175], [149, 256], [196, 308], [237, 308]]
+const redNodes = [[314, 159], [314, 226], [262, 145], [209, 94], [173, 94]]
 
-const fadeUp = (delay = 0, reduced: boolean | null) =>
-  reduced
-    ? {}
-    : {
-        initial: { opacity: 0, y: 28 },
-        animate: { opacity: 1, y: 0 },
-        transition: { duration: 0.7, delay, ease },
-      }
-
-const fadeX = (from: number, delay = 0, reduced: boolean | null) =>
-  reduced
-    ? {}
-    : {
-        initial: { opacity: 0, x: from },
-        animate: { opacity: 1, x: 0 },
-        transition: { duration: 0.85, delay, ease },
-      }
+function RiftMap() {
+  return (
+    <div className="rift-map" aria-hidden="true">
+      <svg viewBox="0 0 410 400" fill="none">
+        <defs>
+          <pattern id="rift-grid" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M20 0H0V20" stroke="#b1c3dc" strokeOpacity=".13" />
+          </pattern>
+          <linearGradient id="rift-map-tone" x1="75" y1="320" x2="335" y2="75" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#17395c" /><stop offset=".48" stopColor="#101626" /><stop offset="1" stopColor="#49232d" />
+          </linearGradient>
+          <linearGradient id="rift-lanes" x1="96" y1="308" x2="314" y2="94" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#6bcfff" /><stop offset=".5" stopColor="#b8bdcd" /><stop offset="1" stopColor="#ff8c98" />
+          </linearGradient>
+          <filter id="rift-glow" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation="4" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
+        </defs>
+        <path d="M77 59H305L351 105V328L329 350H100L59 309V82Z" fill="url(#rift-map-tone)" stroke="#68778d" strokeOpacity=".7" />
+        <path d="M77 59H305L351 105V328L329 350H100L59 309V82Z" fill="url(#rift-grid)" />
+        <path d="M76 80L110 120 158 142 191 179 228 214 265 257 317 279 348 318" stroke="#536880" strokeOpacity=".34" strokeWidth="24" />
+        <path d="M76 80L110 120 158 142 191 179 228 214 265 257 317 279 348 318" stroke="#9db2ce" strokeOpacity=".4" strokeDasharray="4 8" />
+        <path d={lanes} stroke="#080c15" strokeWidth="15" strokeLinejoin="round" />
+        <path d={lanes} stroke="url(#rift-lanes)" strokeWidth="2" />
+        <path d="M111 201L142 167 164 179 128 219ZM192 144L208 114 252 121 224 152ZM221 253L188 281 157 277 189 249ZM280 199L295 181 302 214 277 236Z" stroke="#a9b8cb" strokeOpacity=".28" fill="#899cb2" fillOpacity=".09" />
+        <g fill="#8edbff" filter="url(#rift-glow)">
+          {blueNodes.map(([x, y]) => <circle key={x + ':' + y} cx={x} cy={y} r="3" />)}
+          <path d="M96 294L110 308 96 322 82 308Z" />
+        </g>
+        <g fill="#ff929e" filter="url(#rift-glow)">
+          {redNodes.map(([x, y]) => <circle key={x + ':' + y} cx={x} cy={y} r="3" />)}
+          <path d="M314 80L328 94 314 108 300 94Z" />
+        </g>
+        <circle cx="205" cy="201" r="29" stroke="#dcc58f" strokeOpacity=".48" strokeDasharray="2 5" />
+        <circle cx="205" cy="201" r="19" fill="#111521" stroke="#dcc58f" />
+        <text x="205" y="206" textAnchor="middle" fill="#f3dca9" fontSize="12" fontWeight="700">VS</text>
+      </svg>
+      <span className="map-label map-red"><i /> RED SIDE</span>
+      <span className="map-label map-blue"><i /> BLUE SIDE</span>
+      <span className="map-index">01 / SUMMONER’S RIFT</span>
+    </div>
+  )
+}
 
 export default function Home() {
   const reduced = useReducedMotion()
-
   return (
-    <div className="home">
+    <div className="rift-home">
       <Header />
-
-      <section className="v1-hero">
-        <HeroVisual />
-        <div className="hero-glow hero-glow-blue" aria-hidden />
-        <div className="hero-glow hero-glow-red" aria-hidden />
-        <div className="hero-grid" aria-hidden />
-        <div className="hero-beam hero-beam-blue" aria-hidden />
-        <div className="hero-beam hero-beam-red" aria-hidden />
-        <div className="hero-scanlines" aria-hidden />
-
-        <HeroParallax reduced={reduced}>
-          <div className="v1-split">
-            <motion.div className="v1-side blue" {...fadeX(-56, 0.12, reduced)}>
-              <div className="side-inner">
-                <div className="side-tag">
-                  <span>BLUE SIDE</span>
-                  <span className="dot pulse-blue" />
-                </div>
-                <h2>
-                  Bal-
-                  <br />
-                  anced.
-                </h2>
-                <div className="hex">// avg rate · 1842</div>
-              </div>
-            </motion.div>
-
-            <motion.div
-              className="v1-vs"
-              initial={reduced ? false : { opacity: 0, scale: 0.5 }}
-              animate={reduced ? undefined : { opacity: 1, scale: 1 }}
-              transition={{ duration: 0.65, delay: 0.35, ease }}
-            >
-              <span className="vs-ring" aria-hidden />
-              <span className="vs-badge">VS</span>
-            </motion.div>
-
-            <motion.div className="v1-side red" {...fadeX(56, 0.12, reduced)}>
-              <div className="side-inner">
-                <div className="side-tag">
-                  <span className="dot pulse-red" />
-                  <span>RED SIDE</span>
-                </div>
-                <h2>
-                  Fair
-                  <br />
-                  fight.
-                </h2>
-                <div className="hex">// avg rate · 1838</div>
-              </div>
-            </motion.div>
+      <main>
+        <section className="rift-hero">
+          <div className="rift-wrap rift-stage">
+            <div className="rift-copy">
+              <p className="rift-eyebrow"><span /> LEAGUE OF LEGENDS / CUSTOM 5V5</p>
+              <h1>RIFT<span>.</span><br /><em>TEAM MAKER</em></h1>
+              <p className="rift-lede">いつもの10人で、次の一戦へ。</p>
+              <p className="rift-desc">レートと希望ロールからチームを自動編成。<br />試合が終わったら、勝敗とレート変動を記録。</p>
+              <Link href="/team-maker" className="rift-start">チームを作成 <span aria-hidden="true">↗</span></Link>
+            </div>
+            <RiftMap />
           </div>
-        </HeroParallax>
-      </section>
-
-      <motion.div
-        className="v1-meta"
-        initial={reduced ? false : { opacity: 0, y: 16 }}
-        animate={reduced ? undefined : { opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, delay: 0.45, ease }}
-      >
-        <div className="cell">
-          <div className="k">Δ Rate Diff</div>
-          <div className="v">
-            <CountUp value={4} />
-            <span className="unit">pts</span>
+          <div className="rift-wrap rift-strip">
+            <span><b>01</b> メンバーを選ぶ</span><span><b>02</b> チームを分ける</span><span><b>03</b> 勝敗を記録する</span>
           </div>
-        </div>
-        <div className="cell">
-          <div className="k">Players Pool</div>
-          <div className="v">
-            <CountUp value={42} />
+        </section>
+        <section className="rift-wrap rift-tools" aria-labelledby="rift-tools-title">
+          <div className="rift-tools-head">
+            <p className="rift-eyebrow"><span /> TEAM OPERATIONS</p>
+            <h2 id="rift-tools-title">メンバーと試合記録</h2>
           </div>
-        </div>
-        <div className="cell">
-          <div className="k">Matches Logged</div>
-          <div className="v">
-            <CountUp value={137} />
-          </div>
-        </div>
-        <div className="cell">
-          <div className="k">Last Build</div>
-          <div className="v">
-            21:42<span className="unit">JST</span>
-          </div>
-        </div>
-      </motion.div>
-
-      <div className="container">
-        <motion.div
-          className="v1-actions"
-          initial={reduced ? false : 'hidden'}
-          animate={reduced ? undefined : 'show'}
-          variants={{
-            hidden: {},
-            show: { transition: { staggerChildren: 0.09, delayChildren: 0.55 } },
-          }}
-        >
-          {actions.map((a) => (
-            <motion.div
-              key={a.href}
-              variants={{
-                hidden: reduced ? {} : { opacity: 0, y: 28 },
-                show: reduced ? {} : { opacity: 1, y: 0, transition: { duration: 0.55, ease } },
-              }}
-            >
-              <ActionCard action={a} reduced={reduced} />
-            </motion.div>
-          ))}
-        </motion.div>
-      </div>
-
+          <div className="rift-actions">{actions.map((action) => <ActionCard key={action.href} action={action} reduced={reduced} />)}</div>
+        </section>
+      </main>
       <style dangerouslySetInnerHTML={{ __html: css }} />
     </div>
   )
 }
 
 const css = `
-.home { overflow-x: clip; }
-
-.container { max-width: 1440px; margin: 0 auto; padding: 0 32px; }
-.mono { font-family: var(--font-mono), ui-monospace, monospace; }
-
-.v1-hero {
-  position: relative; overflow: hidden;
-  border-bottom: 1px solid var(--line);
-  min-height: 480px;
+.rift-home { --rift-gold:#ead29b; --rift-muted:#aab5ca; background:#0b0f19; color:#f3f5fb; }
+.rift-wrap { width:min(1220px, calc(100% - 80px)); margin-inline:auto; }
+.rift-hero { border-bottom:1px solid #2c3648; overflow:hidden; background:radial-gradient(ellipse at 12% 85%, #172941 0%, transparent 58%), radial-gradient(ellipse at 95% 0%, #341f32 0%, transparent 55%), #101524; }
+.rift-stage { min-height:540px; display:grid; grid-template-columns:1.08fr 1fr; align-items:center; gap:20px; padding-block:52px 42px; }
+.rift-eyebrow,.map-label,.map-index,.rift-strip,.rift-home .num,.rift-home .mono { font-family:var(--font-mono),monospace; letter-spacing:.13em; }
+.rift-eyebrow { display:flex; align-items:center; gap:9px; color:var(--rift-gold); font-size:10px; font-weight:700; }
+.rift-eyebrow > span { width:7px; height:7px; border:1px solid currentColor; transform:rotate(45deg); }
+.rift-copy h1 { font:700 clamp(4.25rem,10vw,8.8rem)/.81 var(--font-display),sans-serif; margin:26px 0 25px; letter-spacing:-.075em; }
+.rift-copy h1 > span { color:var(--rift-gold); }
+.rift-copy h1 em { font:inherit; font-size:.47em; font-style:normal; letter-spacing:-.055em; color:#c6d5ec; white-space:nowrap; }
+.rift-lede { font-weight:700; font-size:clamp(18px,2.5vw,25px); margin-bottom:8px; }
+.rift-desc { color:var(--rift-muted); font-size:14px; line-height:1.8; }
+.rift-start { display:inline-flex; gap:34px; align-items:center; margin-top:24px; padding:14px 20px; background:var(--rift-gold); color:#15141b; border-radius:4px; box-shadow:0 0 36px #ead29b24; font-weight:800; transition:background .18s; }
+.rift-start:hover { background:#ffebba; }
+.rift-start span { font-size:18px; line-height:1; }
+.rift-map { position:relative; width:min(100%, 500px); margin-inline:auto; background:radial-gradient(ellipse, #5472a01c, transparent 68%); }
+.rift-map svg { display:block; width:100%; filter:drop-shadow(0 18px 30px #060a1299); }
+.map-label,.map-index { position:absolute; font-size:clamp(8px,1vw,11px); }
+.map-label { display:flex; gap:7px; align-items:center; font-weight:700; background:#101523; border:1px solid #4d5367; padding:6px 8px; }
+.map-label i { width:6px; height:6px; background:currentColor; transform:rotate(45deg); }
+.map-red { top:9%; right:3%; color:#ffa5af; }
+.map-blue { bottom:11%; left:3%; color:#9adfff; }
+.map-index { bottom:2%; right:9%; color:var(--rift-muted); }
+.rift-strip { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); border-top:1px solid #3d4a60; }
+.rift-strip span { padding:15px 0; color:var(--rift-muted); font-size:11px; letter-spacing:.06em; }
+.rift-strip b { color:var(--rift-gold); margin-right:8px; }
+.rift-tools { padding-block:36px 64px; }
+.rift-tools-head { margin-bottom:17px; }
+.rift-tools h2 { font-weight:700; font-size:24px; margin-top:5px; }
+.rift-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+.rift-home .action-card { position:relative; overflow:hidden; min-height:166px; display:flex; flex-direction:column; padding:17px 19px; border:1px solid #343e52; border-radius:8px; background:#141c2b; }
+.rift-home .action-card:hover { border-color:#98835c; }
+.rift-home .action-card h3,.rift-home .action-card p,.rift-home .action-card .num,.rift-home .cta-row { position:relative; }
+.rift-home .action-card h3 { font-size:17px; font-weight:700; margin-block:6px; }
+.rift-home .action-card p { color:var(--rift-muted); font-size:13px; margin-bottom:14px; }
+.rift-home .num,.rift-home .mono { color:var(--rift-gold); font-size:10px; }
+.rift-home .cta-row { display:flex; justify-content:space-between; align-items:center; margin-top:auto; border-top:1px solid #343e52; padding-top:8px; }
+.rift-home .card-shine { position:absolute; inset:0; pointer-events:none; opacity:0; background:radial-gradient(270px at var(--mx,50%) var(--my,50%),#cfa75b24,transparent 72%); }
+.rift-home .action-card:hover .card-shine { opacity:1; }
+.rift-home a:focus-visible { outline:2px solid var(--rift-gold); outline-offset:4px; }
+@media(max-width:760px) {
+  .rift-wrap { width:calc(100% - 36px); }
+  .rift-stage { grid-template-columns:1fr; min-height:auto; gap:12px; padding-block:38px 14px; }
+  .rift-map { max-width:340px; }
+  .rift-actions { grid-template-columns:1fr; }
+  .rift-tools { padding-block:26px 42px; }
+  .rift-home .action-card { min-height:140px; }
 }
-.hero-canvas {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  z-index: 0; pointer-events: none;
-}
-.hero-three {
-  position: absolute; inset: 0; width: 100%; height: 100%;
-  z-index: 0; pointer-events: none;
-}
-.hero-three canvas { display: block; width: 100% !important; height: 100% !important; }
-.hero-visual-placeholder { position: absolute; inset: 0; z-index: 0; background: var(--bg-0); }
-.hero-glow {
-  position: absolute; width: 58%; height: 130%;
-  top: -15%; filter: blur(90px); opacity: 0.4;
-  pointer-events: none; z-index: 0;
-  animation: breathe 5s ease-in-out infinite;
-}
-.hero-glow-blue {
-  left: -12%;
-  background: radial-gradient(ellipse, var(--blue) 0%, transparent 68%);
-}
-.hero-glow-red {
-  right: -12%;
-  background: radial-gradient(ellipse, var(--red) 0%, transparent 68%);
-  animation-delay: -2.5s;
-}
-.hero-grid {
-  position: absolute; inset: 0; opacity: 0.055; z-index: 0;
-  background-image:
-    linear-gradient(var(--line-2) 1px, transparent 1px),
-    linear-gradient(90deg, var(--line-2) 1px, transparent 1px);
-  background-size: 40px 40px;
-  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black 20%, transparent 100%);
-}
-.hero-beam {
-  position: absolute; top: 0; width: 2px; height: 100%;
-  opacity: 0.35; z-index: 0; pointer-events: none;
-  animation: beam-drift 8s ease-in-out infinite;
-}
-.hero-beam-blue {
-  left: 28%;
-  background: linear-gradient(180deg, transparent, var(--blue), transparent);
-  box-shadow: 0 0 24px var(--blue);
-}
-.hero-beam-red {
-  right: 28%;
-  background: linear-gradient(180deg, transparent, var(--red), transparent);
-  box-shadow: 0 0 24px var(--red);
-  animation-delay: -4s;
-}
-.hero-scanlines {
-  position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0.04;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    oklch(0.96 0.01 250 / 0.5) 2px,
-    oklch(0.96 0.01 250 / 0.5) 3px
-  );
-}
-
-.v1-split-inner { position: relative; z-index: 3; transform-style: preserve-3d; }
-.v1-split {
-  display: grid; grid-template-columns: 1fr auto 1fr;
-  min-height: 480px; align-items: stretch;
-}
-.v1-side {
-  padding: 52px 56px 44px; position: relative;
-  display: flex; flex-direction: column; justify-content: center;
-}
-.v1-side.blue {
-  background: linear-gradient(135deg, color-mix(in oklch, var(--blue-bg) 65%, transparent) 0%, transparent 85%);
-  text-align: right;
-}
-.v1-side.red {
-  background: linear-gradient(225deg, color-mix(in oklch, var(--red-bg) 65%, transparent) 0%, transparent 85%);
-}
-.side-inner { position: relative; z-index: 1; }
-.v1-side .side-tag {
-  font-family: 'JetBrains Mono'; font-size: 11px; text-transform: uppercase; letter-spacing: 0.18em;
-  display: flex; align-items: center; gap: 8px;
-}
-.v1-side.blue .side-tag { justify-content: flex-end; color: var(--blue); }
-.v1-side.red .side-tag { color: var(--red); }
-.side-tag .dot {
-  width: 7px; height: 7px; border-radius: 50%;
-  box-shadow: 0 0 0 4px color-mix(in oklch, currentColor 18%, transparent);
-}
-.v1-side.blue .side-tag .dot { background: var(--blue); }
-.v1-side.red .side-tag .dot { background: var(--red); }
-.pulse-blue { animation: pulse-dot 2.4s ease-in-out infinite; }
-.pulse-red { animation: pulse-dot 2.4s ease-in-out infinite 1.2s; }
-
-.v1-side h2 {
-  font-family: 'Space Grotesk'; font-weight: 700; font-size: clamp(52px, 7.8vw, 112px);
-  line-height: 0.9; letter-spacing: -0.04em; margin: 28px 0 0;
-}
-.v1-side.blue h2 {
-  color: var(--blue);
-  text-shadow: 0 0 80px color-mix(in oklch, var(--blue) 45%, transparent);
-}
-.v1-side.red h2 {
-  color: var(--red);
-  text-shadow: 0 0 80px color-mix(in oklch, var(--red) 45%, transparent);
-}
-.v1-side .hex { margin-top: 14px; font-family: 'JetBrains Mono'; font-size: 12px; color: var(--fg-3); }
-
-.v1-vs {
-  width: 1px; position: relative; align-self: stretch;
-  background: linear-gradient(180deg, transparent 0%, var(--line-2) 25%, var(--line-2) 75%, transparent 100%);
-}
-.vs-ring {
-  position: absolute; left: 50%; top: 50%;
-  width: 88px; height: 88px; transform: translate(-50%, -50%);
-  border-radius: 50%;
-  border: 1px solid color-mix(in oklch, var(--line-2) 80%, var(--blue) 20%);
-  animation: ring-spin 12s linear infinite;
-}
-.vs-ring::after {
-  content: ""; position: absolute; inset: -1px; border-radius: 50%;
-  border: 1px solid transparent;
-  border-top-color: var(--red);
-  border-bottom-color: var(--blue);
-  opacity: 0.6;
-}
-.vs-badge {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  font-family: 'Space Grotesk'; font-weight: 700; font-size: 22px;
-  background: color-mix(in oklch, var(--bg-0) 88%, transparent);
-  backdrop-filter: blur(8px);
-  padding: 18px 12px; color: var(--fg-1); letter-spacing: 0.08em;
-  border: 1px solid var(--line-2);
-  border-radius: 10px;
-  animation: vs-glow 3s ease-in-out infinite;
-}
-
-.v1-meta { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--bg-1); position: relative; z-index: 4; }
-.v1-meta .cell { padding: 22px 32px; border-right: 1px solid var(--line); }
-.v1-meta .cell:last-child { border-right: 0; }
-.v1-meta .k { font-family: 'JetBrains Mono'; font-size: 10px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--fg-3); }
-.v1-meta .v { font-family: 'Space Grotesk'; font-size: 28px; font-weight: 600; margin-top: 6px; letter-spacing: -0.02em; }
-.v1-meta .v .unit { font-size: 13px; color: var(--fg-3); margin-left: 4px; font-family: 'JetBrains Mono'; }
-
-.v1-actions { padding: 40px 0 72px; display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 16px; }
-.action-card {
-  border: 1px solid var(--line); border-radius: 14px; padding: 26px; background: var(--bg-1);
-  display: flex; flex-direction: column;
-  min-height: 220px; position: relative; overflow: hidden; text-decoration: none; color: inherit;
-  transition: border-color 0.25s, box-shadow 0.3s, background 0.25s;
-}
-.card-shine {
-  position: absolute; inset: 0; opacity: 0; pointer-events: none;
-  background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 50%), color-mix(in oklch, var(--blue) 14%, transparent), transparent 45%);
-  transition: opacity 0.35s;
-}
-.action-card:hover .card-shine { opacity: 1; }
-.action-card:hover {
-  border-color: var(--line-2);
-  background: var(--bg-2);
-  box-shadow: 0 16px 48px color-mix(in oklch, var(--bg-0) 50%, transparent), 0 0 0 1px color-mix(in oklch, var(--line-2) 50%, transparent);
-}
-.action-card.primary {
-  background: linear-gradient(135deg, color-mix(in oklch, var(--blue-bg) 75%, var(--bg-1)) 0%, color-mix(in oklch, var(--red-bg) 55%, var(--bg-1)) 100%);
-  border-color: var(--line-2);
-}
-.action-card.primary .card-shine {
-  background: radial-gradient(480px circle at var(--mx, 50%) var(--my, 50%), color-mix(in oklch, var(--gold) 12%, transparent), transparent 50%);
-}
-.action-card .num { font-family: 'JetBrains Mono'; font-size: 11px; color: var(--fg-3); letter-spacing: 0.1em; position: relative; z-index: 1; }
-.action-card h3 { white-space: pre-line; font-family: 'Space Grotesk'; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; margin: 18px 0 10px; position: relative; z-index: 1; }
-.action-card.primary h3 { font-size: 36px; }
-.action-card p { color: var(--fg-2); font-size: 13.5px; line-height: 1.55; margin: 0 0 20px; flex: 1; position: relative; z-index: 1; }
-.action-card .cta-row {
-  display: flex; align-items: center; justify-content: space-between; color: var(--fg-1); font-size: 13px;
-  border-top: 1px solid var(--line); padding-top: 16px; position: relative; z-index: 1;
-}
-.action-card .cta-row .arr {
-  width: 28px; height: 28px; border-radius: 50%; background: var(--bg-2); display: grid; place-items: center;
-  transition: background 0.15s, transform 0.2s;
-}
-.action-card:hover .cta-row .arr { background: var(--fg-0); color: var(--bg-0); transform: translateX(3px); }
-.action-card.primary .cta-row .arr { background: var(--fg-0); color: var(--bg-0); }
-.action-card .glyph {
-  position: absolute; right: -10px; top: -10px; width: 90px; height: 90px; border-radius: 50%;
-  opacity: 0.35; transition: opacity 0.35s, transform 0.35s; filter: blur(2px);
-}
-.action-card:hover .glyph { opacity: 0.7; transform: scale(1.2); }
-.action-card.players .glyph { background: radial-gradient(circle, var(--r-mid) 0%, transparent 70%); }
-.action-card.new .glyph { background: radial-gradient(circle, var(--r-jng) 0%, transparent 70%); }
-.action-card.match .glyph { background: radial-gradient(circle, var(--r-top) 0%, transparent 70%); }
-
-@keyframes breathe {
-  0%, 100% { opacity: 0.32; transform: scale(1) translateY(0); }
-  50% { opacity: 0.48; transform: scale(1.06) translateY(-8px); }
-}
-@keyframes pulse-dot {
-  0%, 100% { box-shadow: 0 0 0 4px color-mix(in oklch, currentColor 18%, transparent); }
-  50% { box-shadow: 0 0 0 10px color-mix(in oklch, currentColor 6%, transparent), 0 0 20px color-mix(in oklch, currentColor 30%, transparent); }
-}
-@keyframes vs-glow {
-  0%, 100% { box-shadow: 0 0 24px color-mix(in oklch, var(--fg-2) 10%, transparent); }
-  50% { box-shadow: 0 0 40px color-mix(in oklch, var(--blue) 18%, transparent), 0 0 40px color-mix(in oklch, var(--red) 18%, transparent); }
-}
-@keyframes beam-drift {
-  0%, 100% { transform: translateY(0); opacity: 0.25; }
-  50% { transform: translateY(12px); opacity: 0.45; }
-}
-@keyframes ring-spin {
-  from { transform: translate(-50%, -50%) rotate(0deg); }
-  to { transform: translate(-50%, -50%) rotate(360deg); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hero-glow, .pulse-blue, .pulse-red, .vs-badge, .vs-ring, .hero-beam { animation: none !important; }
-}
-
-@media (max-width: 1024px) {
-  .v1-split { grid-template-columns: 1fr; }
-  .v1-vs { display: none; }
-  .v1-side.blue { text-align: left; }
-  .v1-meta { grid-template-columns: 1fr 1fr; }
-  .v1-actions { grid-template-columns: 1fr 1fr; padding-top: 28px; }
-  .hero-beam { display: none; }
-}
-@media (max-width: 768px) {
-  .container { padding: 0 20px; }
-  .v1-side { padding: 38px 24px 32px; }
-  .v1-meta .cell { padding: 16px 18px; }
-  .v1-actions { grid-template-columns: 1fr; padding-bottom: 56px; }
-}
+@media(prefers-reduced-motion:reduce) { .rift-start { transition:none; } }
 `
