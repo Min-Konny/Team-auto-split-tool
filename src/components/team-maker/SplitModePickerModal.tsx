@@ -81,6 +81,11 @@ export default function SplitModePickerModal({ candidates, open, onPick, onClose
                 <span className="mode-card-score">
                   {meta.scoreLabel} <strong>{meta.scoreOf(c)}</strong>
                 </span>
+                <span className="mode-comparison">
+                  <span>チーム平均差 <b>{Math.round(c.metrics.totalDiff / 5)} pt</b></span>
+                  <span>得意ロール <b>{c.metrics.mainHits}/10</b></span>
+                  <span>最大レーン差 <b>{c.metrics.largestLaneGap.diff ? c.metrics.largestLaneGap.role + ' ' : ''}{Math.round(c.metrics.largestLaneGap.diff)} pt</b></span>
+                </span>
                 <span className="mode-card-cta">この方式で分ける →</span>
               </motion.button>
             )
@@ -94,8 +99,8 @@ export default function SplitModePickerModal({ candidates, open, onPick, onClose
 }
 
 const modeStyles = `
-.mode-overlay{position:fixed;inset:0;z-index:110;background:color-mix(in oklch,var(--bg-0) 88%,transparent);backdrop-filter:blur(10px);display:grid;place-items:center;padding:24px}
-.mode-modal{width:min(720px,100%);background:var(--bg-1);border:1px solid var(--line);border-radius:16px;padding:28px;box-shadow:0 32px 64px color-mix(in oklch,#000 40%,transparent)}
+.mode-overlay{overflow:auto;position:fixed;inset:0;z-index:110;background:color-mix(in oklch,var(--bg-0) 88%,transparent);backdrop-filter:blur(10px);display:grid;place-items:center;padding:24px}
+.mode-modal{max-height:100%;overflow:auto;width:min(720px,100%);background:var(--bg-1);border:1px solid var(--line);border-radius:16px;padding:28px;box-shadow:0 32px 64px color-mix(in oklch,#000 40%,transparent)}
 .mode-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:24px}
 .mode-kicker{margin:0 0 6px;font-family:'JetBrains Mono';font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--fg-3)}
 .mode-hd h2{margin:0;font-family:'Space Grotesk';font-size:22px;font-weight:700}
@@ -111,6 +116,7 @@ const modeStyles = `
 .mode-card-score{font-family:'JetBrains Mono';font-size:11px;color:var(--fg-3);margin-bottom:14px}
 .mode-card-score strong{font-size:20px;color:var(--fg-0);margin:0 4px}
 .mode-card-sub{font-size:10px}
+.mode-comparison{display:grid;gap:3px;margin-bottom:14px;color:var(--fg-2);font-size:11px}.mode-comparison b{color:var(--fg-0)}
 .mode-card-cta{font-family:'Space Grotesk';font-size:12px;font-weight:600;color:var(--fg-1)}
 .mode-card.accent-blue .mode-card-cta{color:var(--blue)}
 .mode-card.accent-red .mode-card-cta{color:var(--red)}

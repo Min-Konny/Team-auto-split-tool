@@ -8,10 +8,12 @@ import { getEffectiveElo, ROLE_TIER_LABEL } from '@/lib/roleTier'
 import {
   getAvgRate,
   getTotalRate,
+  measureSplit,
   SplitCandidate,
   SplitMode,
   Teams,
 } from '@/lib/teamBalancer'
+import { createResultCard } from '@/lib/resultCard'
 import { formatTeamsForChat } from '@/lib/teamClipboard'
 
 const ROLES: GameRole[] = [GameRole.TOP, GameRole.JUNGLE, GameRole.MID, GameRole.ADC, GameRole.SUP]
@@ -42,6 +44,7 @@ type Props = {
   registerError: string | null
   onClose: () => void
   onRegenerate: () => void
+  onRematch: (keepTeams: boolean) => void
   onPickCandidate: (index: number) => void
   onSwapClick: (team: 'blue' | 'red', idx: number) => void
   onSwapCancel: () => void
@@ -70,6 +73,7 @@ export default function TeamSplitOverlay({
   registerError,
   onClose,
   onRegenerate,
+  onRematch,
   onPickCandidate,
   onSwapClick,
   onSwapCancel,
@@ -79,7 +83,38 @@ export default function TeamSplitOverlay({
   const [showSwapHint, setShowSwapHint] = useState(false)
   const ratingSection = useRef<HTMLElement>(null)
   const [copied, setCopied] = useState(false)
-  const activeMetrics = candidates[activeCandidate]?.metrics
+  const [shareStatus, setShareStatus] = useState('')
+  const [sharing, setSharing] = useState(false)
+  const metrics = measureSplit(teams)
+  const shareResult = async () => {
+    if (!result || sharing) return
+    setSharing(true)
+    setShareStatus('')
+    const png = createResultCard(teams, result, eloChanges)
+    try {
+      try {
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': png })])
+        setShareStatus('画像をコピーしました。Discordに貼り付けできます。')
+      } catch {
+        const url = URL.createObjectURL(await png)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = 'lol-team-maker-result.png'
+        link.click()
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+        setShareStatus('PNGをダウンロードしました。')
+      }
+    } catch {
+      setShareStatus('結果画像を作成できませんでした。')
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  const rematch = (keepTeams: boolean) => {
+    setShareStatus('')
+    onRematch(keepTeams)
+  }
   const totalDiff = Math.round(Math.abs(getTotalRate(teams.blue) - getTotalRate(teams.red)))
 
   useEffect(() => {
@@ -171,9 +206,7 @@ export default function TeamSplitOverlay({
             <button type="button" className="copy-btn" onClick={copyTeamsToChat} disabled={shuffling}>
               {copied ? 'コピー済' : 'チャット用コピー'}
             </button>
-            <button type="button" className="regen-btn" onClick={onRegenerate} disabled={registering}>
-              再生成
-            </button>
+            {!result && <button type="button" className="regen-btn" onClick={onRegenerate} disabled={registering}>再生成</button>}
             <button type="button" className="icon-btn" aria-label="チーム表示を閉じる" disabled={registering} onClick={onClose}>
               ✕
             </button>
@@ -198,7 +231,7 @@ export default function TeamSplitOverlay({
           </div>
         </div>
 
-        {candidates[activeCandidate]?.reasons && (
+        {!result && (
           <motion.div
             className="cand-reasons"
             key={`reasons-${revealKey}`}
@@ -206,12 +239,9 @@ export default function TeamSplitOverlay({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35, duration: 0.4 }}
           >
-            {candidates[activeCandidate].reasons.map((r) => (
-              <span key={r} className="cand-reason-chip">
-                {r}
-              </span>
-            ))}
-            <span className="cand-reason-chip">BLUE勝率目安 {activeMetrics?.blueWinChance ?? 50}%</span>
+            <span className="cand-reason-chip">チーム平均差 {Math.round(metrics.totalDiff / 5)} pt</span>
+            <span className="cand-reason-chip">得意ロール {metrics.mainHits}/10</span>
+            <span className="cand-reason-chip">最大レーン差 {metrics.largestLaneGap.diff ? metrics.largestLaneGap.role + ' ' : ''}{Math.round(metrics.largestLaneGap.diff)} pt</span>
           </motion.div>
         )}
 
@@ -414,6 +444,17 @@ export default function TeamSplitOverlay({
 
         </div>
         <div className="result-controls">
+          {result && (
+            <section className="rematch-panel" aria-label="次の試合と共有">
+              <strong>同じ10人で次の試合</strong>
+              <div className="rematch-actions">
+                <button type="button" className="regen-btn" disabled={sharing} onClick={() => rematch(true)}>同じチームで再戦</button>
+                <button type="button" className="regen-btn" disabled={sharing} onClick={() => rematch(false)}>組み直す</button>
+                <button type="button" className="copy-btn" disabled={sharing} onClick={shareResult}>結果画像をコピー</button>
+              </div>
+              <p role="status">{shareStatus}</p>
+            </section>
+          )}
           {!result && (
             <fieldset className="performance-panel">
               <legend>個人補正 <small>任意</small></legend>
@@ -495,6 +536,11 @@ export default function TeamSplitOverlay({
         .rating-kicker { margin-bottom: 5px; color: var(--ok); }
         .match-rating { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-1); }
         .result-controls { flex-shrink: 0; border-top: 1px solid var(--line); background: var(--bg-0); }
+        .rematch-panel { display: grid; gap: 8px; padding: 12px clamp(12px, 3vw, 28px); }
+        .rematch-panel strong { font-size: 13px; }
+        .rematch-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+        .rematch-panel p { color: var(--fg-1); font-size: 12px; }
+        .rematch-panel p:empty { display: none; }
         .performance-panel { max-width: 720px; min-inline-size: 0; border: 0; margin: 8px 28px 10px; padding: 0; }
         .performance-panel legend { padding: 0; margin-bottom: 4px; font-size: 13px; font-weight: 700; }
         .performance-panel small { margin-left: 4px; color: var(--fg-2); font-weight: 400; }

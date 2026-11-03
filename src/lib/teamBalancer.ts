@@ -20,6 +20,7 @@ export interface Teams {
 export interface SplitMetrics {
   totalDiff: number
   avgLaneDiff: number
+  largestLaneGap: { role: GameRole; diff: number }
   partySpread: number
   mainHits: number
   balanceScore: number
@@ -52,8 +53,11 @@ function assignRolesToTeam(teamMembers: Member[]): TeamSlot[] {
 }
 
 function evaluateSplit(blueMembers: Member[], redMembers: Member[]): { teams: Teams; metrics: SplitMetrics } {
-  const blue = assignRolesToTeam(blueMembers)
-  const red = assignRolesToTeam(redMembers)
+  const teams = { blue: assignRolesToTeam(blueMembers), red: assignRolesToTeam(redMembers) }
+  return { teams, metrics: measureSplit(teams) }
+}
+
+export function measureSplit({ blue, red }: Teams): SplitMetrics {
 
   const blueEff = blue.map((s) => getEffectiveElo(s.member, s.role))
   const redEff = red.map((s) => getEffectiveElo(s.member, s.role))
@@ -81,16 +85,15 @@ function evaluateSplit(blueMembers: Member[], redMembers: Member[]): { teams: Te
     (1 / (1 + Math.pow(10, (redTotal - blueTotal) / 400))) * 100
   )
 
+  const largestLaneIndex = laneDiffs.indexOf(Math.max(...laneDiffs))
   return {
-    teams: { blue, red },
-    metrics: {
-      totalDiff,
-      avgLaneDiff,
-      partySpread,
-      mainHits,
-      balanceScore,
-      blueWinChance,
-    },
+    totalDiff,
+    avgLaneDiff,
+    largestLaneGap: { role: ROLES[largestLaneIndex], diff: laneDiffs[largestLaneIndex] },
+    partySpread,
+    mainHits,
+    balanceScore,
+    blueWinChance,
   }
 }
 

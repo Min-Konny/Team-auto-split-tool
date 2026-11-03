@@ -20,7 +20,7 @@ import type { MatchPerformance } from '@/lib/elo'
 import type { MatchEloChange } from '@/types'
 import { fetchMembers } from '@/lib/members'
 import { getStoredActiveLobbyId, setStoredActiveLobbyId } from '@/lib/memberSession'
-import { generateThreeCandidates, SplitCandidate, Teams } from '@/lib/teamBalancer'
+import { generateThreeCandidates, measureSplit, SplitCandidate, Teams } from '@/lib/teamBalancer'
 import { useCommunity } from '@/lib/useCommunity'
 import { GameRole, Rank } from '@/types'
 import { Member } from '@/types/member'
@@ -295,6 +295,28 @@ export default function TeamMakerPage() {
     if (!registrationBusy.current) runTeamSplit(selected.map(({ member }) => member), true)
   }
 
+  const startRematch = (keepTeams: boolean) => {
+    if (!result || !teams || registrationBusy.current) return
+    const currentMembers = new Map(selected.map(({ member }) => [member.id, member]))
+    const refresh = (slots: Teams['blue']) => slots.map((slot) => ({
+      ...slot,
+      member: currentMembers.get(slot.member.id) ?? slot.member,
+    }))
+    const next = { blue: refresh(teams.blue), red: refresh(teams.red) }
+    const roster = [...next.blue, ...next.red].map(({ member }) => member)
+    if (!keepTeams) {
+      runTeamSplit(roster, true)
+      return
+    }
+    const nextCandidates = generateThreeCandidates(roster)
+    const retained = nextCandidates[activeCandidate]
+    nextCandidates[activeCandidate] = { ...retained, teams: next, metrics: measureSplit(next) }
+    setCandidates(nextCandidates)
+    setTeams(next)
+    resetMatchResult()
+    setRevealKey((key) => key + 1)
+  }
+
   // 10人揃ったら自動チーム分け / 10人未満ならリセット
   useEffect(() => {
     if (selected.length < 10) {
@@ -368,7 +390,7 @@ export default function TeamMakerPage() {
           players,
           performance,
           registrationId: registrationId.current,
-          balanceScore: candidates?.[activeCandidate]?.metrics.balanceScore,
+          balanceScore: measureSplit(teams).balanceScore,
           splitMode: candidates?.[activeCandidate]?.mode,
         }),
       })
@@ -572,6 +594,7 @@ export default function TeamMakerPage() {
             registerError={registerError}
             onClose={() => { if (!registrationBusy.current) setShowOverlay(false) }}
             onRegenerate={createTeams}
+            onRematch={startRematch}
             onPickCandidate={pickCandidate}
             onSwapClick={handleSwapClick}
             onSwapCancel={() => setSwapSource(null)}
