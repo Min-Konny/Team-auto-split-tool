@@ -188,14 +188,19 @@ export default function DraftPage() {
   }
 
   function renderSlots(side: Side, kind: 'BAN' | 'PICK') {
+    let slotNumber = 0
     return draftOrder.map((slot, index) => {
       if (slot.side !== side || slot.kind !== kind) return null
+      slotNumber += 1
       const choice = activeRoom?.choices[index]
       const champion = choice ? championsById.get(choice) : undefined
       return <span className="draft-slot" key={index} data-active={index === turn} title={champion?.name}>
-        {champion ? <img src={portrait(champion.image)} alt={kind === 'BAN' ? champion.name : ''} width="36" height="36" />
-          : <span className="draft-empty" aria-hidden="true">{choice === null ? '×' : '◇'}</span>}
-        {kind === 'PICK' && <span className="draft-slot-label">{champion?.name ?? (index === turn ? '選択中' : '未選択')}</span>}
+        {champion && <img src={portrait(champion.image)} alt={kind === 'BAN' ? champion.name : ''} width="36" height="36" />}
+        {!champion && kind === 'BAN' && <span className="draft-empty" aria-hidden="true">{choice === null ? '×' : '◇'}</span>}
+        {kind === 'PICK' && <span className="draft-slot-text">
+          <span className="draft-summoner">サモナー{slotNumber}</span>
+          {(champion || index === turn) && <span className="draft-slot-label">{champion?.name ?? '選択中'}</span>}
+        </span>}
       </span>
     })
   }
@@ -294,7 +299,7 @@ export default function DraftPage() {
         </>}
         <p className="draft-credit">LoL Team Maker isn’t endorsed by Riot Games and doesn’t reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.</p>
       </main>
-      <style jsx>{`
+      <style jsx global>{`
         .draft-page { max-width: 1200px; margin: auto; padding: 20px clamp(12px,3vw,36px) 45px; }
         .draft-head { padding: 16px 20px; border: 1px solid var(--line); border-radius: 12px; background: linear-gradient(110deg,var(--blue-bg),var(--bg-1),var(--red-bg)); }
         .draft-head h1 { font: 700 clamp(34px,6vw,60px)/1 var(--font-display),sans-serif; margin-block: 5px; }
@@ -304,9 +309,9 @@ export default function DraftPage() {
         .draft-share button { border-color: var(--gold); color: var(--gold); font-weight: 700; }
         .draft-share textarea { width: 100%; padding: 8px; border: 1px solid var(--line-2); border-radius: 6px; background: var(--bg-1); }
         .draft-links label { display: grid; flex: 1 1 180px; gap: 4px; font-size: 12px; }
-        input,button { min-width: 0; border-radius: 6px; padding: 7px 10px; border: 1px solid var(--line-2); background: var(--bg-1); color: var(--fg-0); }
-        button:disabled { opacity: .5; }
-        button[aria-pressed=true] { border-color: var(--gold); }
+        .draft-page input,.draft-page button { min-width: 0; border-radius: 6px; padding: 7px 10px; border: 1px solid var(--line-2); background: var(--bg-1); color: var(--fg-0); }
+        .draft-page button:disabled { opacity: .5; }
+        .draft-page button[aria-pressed=true] { border-color: var(--gold); }
         .draft-page.room-open { max-width: 1460px; padding: 8px clamp(10px, 2vw, 24px) 20px; }
         .room-open .draft-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; }
         .room-open .draft-head h1 { font-size: 20px; margin: 0; }
@@ -322,11 +327,13 @@ export default function DraftPage() {
         .draft-side h2 { font-weight: 800; color: var(--blue); }
         .draft-side.red h2 { color: var(--red); text-align: right; }
         .draft-side small { color: var(--fg-1); font-size: 10px; }
-        .draft-picks { display: grid; grid-template-rows: repeat(5, minmax(0, 1fr)); flex: 1; min-height: 0; gap: 5px; }
+        .draft-picks { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: repeat(5, minmax(0, 1fr)); flex: 1; min-height: 0; gap: 5px; }
         .draft-slot { min-width: 0; display: flex; align-items: center; gap: 7px; background: #0a111c; border: 1px solid var(--line); border-radius: 5px; padding: 4px; font-size: 12px; }
         .red .draft-picks .draft-slot { flex-direction: row-reverse; text-align: right; }
         .draft-slot[data-active=true] { border-color: var(--gold); color: var(--gold); }
         .draft-slot img { flex-shrink: 0; border-radius: 4px; }
+        .draft-slot-text { min-width: 0; display: grid; gap: 2px; }
+        .draft-summoner { color: var(--fg-1); font-size: 11px; white-space: nowrap; }
         .draft-slot-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .draft-empty { display: grid; place-items: center; width: 36px; flex-shrink: 0; color: var(--fg-2); }
         .draft-pool { display: flex; min-width: 0; min-height: 0; flex-direction: column; border-inline: 1px solid #52452f; }
@@ -355,15 +362,16 @@ export default function DraftPage() {
         .draft-confirm { border-color: var(--gold); background: var(--gold); color: #17131a; font-weight: 800; }
         .draft-complete { margin: auto; text-align: center; color: var(--gold); font-size: 24px; }
         .draft-complete small { display: block; color: var(--fg-1); font-size: 12px; }
-        :global(.draft-timer) { font-variant-numeric: tabular-nums; color: var(--gold); }
-        :global(.draft-timer.overtime) { color: var(--red); }
+        .draft-timer { font-variant-numeric: tabular-nums; color: var(--gold); }
+        .draft-timer.overtime { color: var(--red); }
         @media (max-width: 720px) {
           .draft-arena { --draft-side: 51px; }
           .draft-side { padding: 4px; }
           .draft-side h2 { font-size: 10px; text-align: center; }
           .draft-side.red h2 { text-align: center; }
           .draft-side small, .draft-picks .draft-slot-label { display: none; }
-          .draft-picks .draft-slot { justify-content: center; }
+          .draft-picks .draft-slot, .red .draft-picks .draft-slot { flex-direction: column; justify-content: center; gap: 2px; padding: 1px; }
+          .draft-summoner { font-size: 8px; }
           .draft-picks img { width: 28px; height: 28px; }
           .draft-arena-body { height: clamp(265px, calc(100dvh - 255px), 520px); }
           .draft-pool-toolbar input { width: 100%; }
