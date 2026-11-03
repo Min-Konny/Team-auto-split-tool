@@ -25,6 +25,7 @@ export default function DraftPage() {
   const [selected, setSelected] = useState('')
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
+  const [shareFallback, setShareFallback] = useState('')
   const [busy, setBusy] = useState(false)
   const pending = useRef(false)
   const activeRoom = room?.id === (id || 'local') ? room : undefined
@@ -141,6 +142,26 @@ export default function DraftPage() {
     return side && keys ? url + '#side=' + side + '&key=' + keys[side] : url
   }
 
+  async function copyLink(text: string, combined = false) {
+    setShareFallback('')
+    try {
+      await navigator.clipboard.writeText(text)
+      setStatus(combined ? '3つのリンクをまとめてコピーしました' : 'リンクをコピーしました')
+    } catch {
+      if (combined) setShareFallback(text)
+      setStatus(combined ? '共有メッセージを選んでコピーしてください' : '入力欄のリンクを選んでコピーしてください')
+    }
+  }
+
+  function copyAllLinks() {
+    return copyLink([
+      'LoL BAN / PICK',
+      '🔵 BLUE 操作リンク', linkFor('BLUE'),
+      '🔴 RED 操作リンク', linkFor('RED'),
+      '👀 観戦リンク', linkFor(),
+    ].join('\n'), true)
+  }
+
   return (
     <>
       <Header />
@@ -162,17 +183,15 @@ export default function DraftPage() {
         {status && <p role="status">{status}</p>}
         {activeRoom && <>
           {keys && id && <div className="draft-links">
+            <div className="draft-share">
+              <button type="button" onClick={copyAllLinks}>3つのリンクをまとめてコピー</button>
+              {shareFallback && <textarea aria-label="共有メッセージ" readOnly value={shareFallback} rows={7}
+                onFocus={(event) => event.currentTarget.select()} />}
+            </div>
             {(['BLUE', 'RED', 'VIEW'] as const).map((side) => <label key={side}>
               {side === 'VIEW' ? '観戦リンク' : side + ' 操作リンク'}
               <input readOnly value={linkFor(side === 'VIEW' ? undefined : side)} onFocus={(event) => event.currentTarget.select()} />
-              <button type="button" onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(linkFor(side === 'VIEW' ? undefined : side))
-                  setStatus('リンクをコピーしました')
-                } catch {
-                  setStatus('入力欄のリンクを選んでコピーしてください')
-                }
-              }}>コピー</button>
+              <button type="button" onClick={() => copyLink(linkFor(side === 'VIEW' ? undefined : side))}>コピー</button>
             </label>)}
           </div>}
           <div className="draft-turn" aria-live="polite">
@@ -222,6 +241,9 @@ export default function DraftPage() {
         .draft-head h1 { font: 700 clamp(34px,6vw,60px)/1 var(--font-display),sans-serif; margin-block: 5px; }
         .draft-head p,.draft-credit { color: var(--fg-1); font-size: 12px; }
         .draft-actions,.draft-links { display: flex; flex-wrap: wrap; gap: 8px; margin-block: 12px; }
+        .draft-share { flex: 1 0 100%; display: grid; justify-items: start; gap: 8px; }
+        .draft-share button { border-color: var(--gold); color: var(--gold); font-weight: 700; }
+        .draft-share textarea { width: 100%; padding: 8px; border: 1px solid var(--line-2); border-radius: 6px; background: var(--bg-1); }
         .draft-links label { display: grid; flex: 1 1 180px; gap: 4px; font-size: 12px; }
         input,button { min-width: 0; border-radius: 6px; padding: 7px 10px; border: 1px solid var(--line-2); background: var(--bg-1); color: var(--fg-0); }
         button:disabled { opacity: .5; }
