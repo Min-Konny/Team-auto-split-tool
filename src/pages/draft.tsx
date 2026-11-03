@@ -309,7 +309,7 @@ export default function DraftPage() {
         .draft-share button { border-color: var(--gold); color: var(--gold); font-weight: 700; }
         .draft-share textarea { width: 100%; padding: 8px; border: 1px solid var(--line-2); border-radius: 6px; background: var(--bg-1); }
         .draft-links label { display: grid; flex: 1 1 180px; gap: 4px; font-size: 12px; }
-        .draft-page input,.draft-page button { min-width: 0; border-radius: 6px; padding: 7px 10px; border: 1px solid var(--line-2); background: var(--bg-1); color: var(--fg-0); }
+        .draft-page :where(input,button) { min-width: 0; border-radius: 6px; padding: 7px 10px; border: 1px solid var(--line-2); background: var(--bg-1); color: var(--fg-0); }
         .draft-page button:disabled { opacity: .5; }
         .draft-page button[aria-pressed=true] { border-color: var(--gold); }
         .draft-page.room-open { max-width: 1460px; padding: 8px clamp(10px, 2vw, 24px) 20px; }
