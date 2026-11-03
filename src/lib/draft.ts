@@ -26,3 +26,8 @@ export function appendDraftChoice(
   if (champion === null ? action.kind !== 'BAN' : !championsById.has(champion) || choices.includes(champion)) return null
   return [...choices, champion]
 }
+
+export function normalizeChampionSearch(value: string): string {
+  return value.normalize('NFKC').toLowerCase().replace(/[ァ-ヶ]/g, (kana) =>
+    String.fromCharCode(kana.charCodeAt(0) - 0x60))
+}

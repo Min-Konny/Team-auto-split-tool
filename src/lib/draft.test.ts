@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { it } from 'node:test'
-import { appendDraftChoice, champions, draftOrder } from './draft'
+import { appendDraftChoice, champions, draftOrder, normalizeChampionSearch } from './draft'
 
 it('follows the four tournament draft phases with five bans and picks per side', () => {
   assert.deepEqual(draftOrder.map(({ kind, side }) => kind[0] + side[0]).join(' '),
@@ -27,4 +27,10 @@ it('enforces side, turn, unique champions, and allows passing bans only', () => 
     picks = next
   })
   assert.equal(appendDraftChoice(picks, 20, 'HOST', champion), null)
+})
+
+it('matches hiragana, full-width and half-width katakana, and English IDs', () => {
+  assert.equal(normalizeChampionSearch('あーり'), normalizeChampionSearch('アーリ'))
+  assert.equal(normalizeChampionSearch('ｳﾞｪｲﾝ'), normalizeChampionSearch('ゔぇいん'))
+  assert.equal(normalizeChampionSearch('Ａｈｒｉ'), 'ahri')
 })

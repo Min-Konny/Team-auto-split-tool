@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/router'
 import Header from '@/components/Header'
-import { appendDraftChoice, champions, championsById, draftOrder, patch, type DraftRoom, type Side } from '@/lib/draft'
+import { appendDraftChoice, champions, championsById, draftOrder, normalizeChampionSearch, patch, type DraftRoom, type Side } from '@/lib/draft'
 
 const portrait = (image: string) => 'https://ddragon.leagueoflegends.com/cdn/' + patch + '/img/champion/' + image
 
@@ -34,9 +34,9 @@ export default function DraftPage() {
   const canChoose = action && (seat === 'HOST' || seat === action.side)
   const used = new Set(activeRoom?.choices)
   const preview = selected && !used.has(selected) ? championsById.get(selected) : undefined
-  const normalize = (value: string) => value.normalize('NFKC').toLowerCase()
-  const query = normalize(search.trim())
-  const filtered = champions.filter((champion) => normalize(champion.name).includes(query) || normalize(champion.id).includes(query))
+  const query = normalizeChampionSearch(search.trim())
+  const filtered = champions.filter((champion) =>
+    normalizeChampionSearch(champion.name).includes(query) || normalizeChampionSearch(champion.id).includes(query))
 
   useEffect(() => {
     if (!id) return
@@ -165,7 +165,7 @@ export default function DraftPage() {
   return (
     <>
       <Header />
-      <main className="draft-page">
+      <main className={canChoose ? "draft-page has-confirm-bar" : "draft-page"}>
         <header className="draft-head">
           <p>CUSTOM 5V5 · PATCH {patch}</p>
           <h1>BAN / PICK</h1>
@@ -220,8 +220,6 @@ export default function DraftPage() {
             </figure>}
             <div className="draft-actions">
               <input aria-label="チャンピオン検索" placeholder="チャンピオン名で検索" value={search} onChange={(event) => setSearch(event.target.value)} />
-              {canChoose && <button disabled={busy || !selected || used.has(selected)} onClick={() => confirm(selected)}>{selected ? championsById.get(selected)?.name + ' を ' : ''}{action.kind}確定</button>}
-              {canChoose && action.kind === 'BAN' && <button disabled={busy} onClick={() => confirm(null)}>BANなし</button>}
             </div>
             <div className="draft-champions">
               {filtered.map((champion) => <button type="button" key={champion.id} disabled={!canChoose || busy || used.has(champion.id)}
@@ -231,6 +229,18 @@ export default function DraftPage() {
               </button>)}
               {!filtered.length && <p>該当するチャンピオンはいません。</p>}
             </div>
+            {canChoose && <div className="draft-confirm-bar">
+              <div className="draft-confirm-inner">
+                <div className="draft-confirm-choice" aria-live="polite">
+                  {preview && <img src={portrait(preview.image)} alt="" width="32" height="32" />}
+                  <span><small>{action.side} {action.kind} · {turn + 1}/{draftOrder.length}</small><b>{preview?.name ?? 'チャンピオンを選択'}</b></span>
+                </div>
+                {action.kind === 'BAN' && <button type="button" disabled={busy} onClick={() => confirm(null)}>BANなし</button>}
+                <button type="button" className="draft-confirm" disabled={busy || !preview} onClick={() => confirm(selected)}>
+                  {busy ? '確定中…' : action.kind + '確定'}
+                </button>
+              </div>
+            </div>}
           </>}
         </>}
         <p className="draft-credit">LoL Team Maker isn’t endorsed by Riot Games and doesn’t reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.</p>
@@ -264,6 +274,20 @@ export default function DraftPage() {
         .draft-line [data-active=true] { border-color: var(--gold); }
         .draft-champions { display: grid; grid-template-columns: repeat(auto-fill,minmax(85px,1fr)); gap: 6px; }
         .draft-champions button { display: grid; justify-items: center; gap: 3px; font-size: 11px; }
+        .draft-page.has-confirm-bar { padding-bottom: calc(106px + env(safe-area-inset-bottom)); }
+        .draft-confirm-bar {
+          position: fixed; inset: auto 0 0; z-index: 60; background: var(--bg-0); border-top: 1px solid var(--line-2);
+          padding-bottom: env(safe-area-inset-bottom); box-shadow: 0 -8px 24px #0004;
+        }
+        .draft-confirm-inner {
+          max-width: 1200px; margin: auto; padding: 8px clamp(12px,3vw,36px);
+          display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+        }
+        .draft-confirm-choice { display: flex; align-items: center; gap: 8px; flex: 1 1 110px; min-width: 0; overflow-wrap: anywhere; }
+        .draft-confirm-choice img { border-radius: 4px; flex-shrink: 0; }
+        .draft-confirm-choice small { display: block; font-size: 10px; color: var(--fg-1); }
+        .draft-confirm-inner button { min-height: 44px; white-space: nowrap; }
+        .draft-confirm { border-color: var(--gold); background: var(--gold); color: #17131a; font-weight: 700; }
         .draft-credit { margin-top: 20px; }
       `}</style>
     </>
