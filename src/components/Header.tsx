@@ -4,7 +4,7 @@ import { useRouter } from 'next/router'
 import { useCommunity } from '@/lib/useCommunity'
 
 const navItem = {
-  px: 3.5,
+  px: { base: 2, md: 3.5 },
   py: 1.5,
   borderRadius: '999px',
   color: 'var(--fg-1)',
@@ -33,7 +33,7 @@ export default function Header() {
       borderBottom="1px solid"
       borderColor="var(--line)"
     >
-      <Flex maxW="1440px" mx="auto" px="28px" py="12px" align="center" justify="space-between">
+      <Flex maxW="1440px" mx="auto" px={{ base: 3, md: 7 }} py="12px" gap={2} wrap="wrap" align="center" justify="space-between">
         <CLink as={Link} href="/" display="flex" alignItems="center" gap={2.5} _hover={{ textDecoration: 'none' }}>
           <Box w="26px" h="26px" position="relative">
             <Box
@@ -59,7 +59,7 @@ export default function Header() {
           </Text>
         </CLink>
 
-        <HStack spacing={1}>
+        <HStack as="nav" aria-label="メインナビゲーション" spacing={1} flexWrap="wrap">
           <CLink as={Link} href="/community" sx={navItem}>{'\u30b3\u30df\u30e5'}</CLink>
           <CLink as={Link} href="/players" sx={navItem}>{'\u30d7\u30ec\u30a4\u30e4\u30fc'}</CLink>
           <CLink as={Link} href="/players/new" sx={navItem}>{'\u767b\u9332'}</CLink>
@@ -69,7 +69,7 @@ export default function Header() {
           </CLink>
           {!loading && community && (
             <>
-              <Text px={2} fontSize="12px" color="var(--fg-3)" whiteSpace="nowrap">
+              <Text display={{ base: 'none', lg: 'block' }} px={2} fontSize="12px" color="var(--fg-3)" whiteSpace="nowrap">
                 {community.name}
               </Text>
               <Box

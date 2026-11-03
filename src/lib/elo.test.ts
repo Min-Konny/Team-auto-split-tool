@@ -42,3 +42,14 @@ describe('computeEloUpdates', () => {
     assert.ok(blueDeltas.size > 1)
   })
 })
+
+it('adds one optional MVP bonus and one penalty on top of the match result', () => {
+  const players = [
+    { memberId: 'blue', elo: 1500, team: 'BLUE' as const },
+    { memberId: 'red', elo: 1500, team: 'RED' as const },
+    { memberId: 'other', elo: 1500, team: 'RED' as const },
+  ]
+  const changes = computeEloUpdates(players, 'BLUE', { mvpId: 'red', penaltyId: 'blue' })
+  assert.deepEqual(changes.map(({ delta, after }) => [delta, after]), [[8, 1508], [-8, 1492], [-16, 1484]])
+  assert.deepEqual(changes.map(({ performanceDelta }) => performanceDelta), [-8, 8, undefined])
+})

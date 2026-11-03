@@ -6,7 +6,7 @@ import { fetchMembers } from '@/lib/members'
 import { matchesCollection } from '@/lib/paths'
 import { getEffectiveElo } from '@/lib/roleTier'
 import { useCommunity } from '@/lib/useCommunity'
-import { GameRole, Match } from '@/types'
+import { GameRole, Match, MatchEloChange } from '@/types'
 import { Member } from '@/types/member'
 
 interface MatchWithPlayers extends Omit<Match, 'players'> {
@@ -22,6 +22,16 @@ const ROLES: GameRole[] = [GameRole.TOP, GameRole.JUNGLE, GameRole.MID, GameRole
 
 const getRateForRole = (member: Member, role: GameRole) => getEffectiveElo(member, role)
 
+function RatingChange({ change, fallback }: { change?: MatchEloChange; fallback: number }) {
+  if (!change) return <span className="detail-rate">{fallback}</span>
+  return (
+    <span className="detail-rate">
+      {change.before} → {change.after} ({change.delta > 0 ? '+' : ''}{change.delta})
+      {change.performance && <small className="detail-performance">{change.performance === 'MVP' ? 'MVP +' : '下方補正 '}{change.performanceDelta}</small>}
+    </span>
+  )
+}
+
 const fmtDate = (seconds: number) => {
   const d = new Date(seconds * 1000)
   return {
@@ -34,19 +44,24 @@ const fmtDate = (seconds: number) => {
 export default function MatchesPage() {
   const { community } = useCommunity()
   const [matches, setMatches] = useState<MatchWithPlayers[]>([])
+  const [loadStatus, setLoadStatus] = useState<'loading' | 'ready' | 'error'>('loading')
   const [filter, setFilter] = useState<'ALL' | 'BLUE' | 'RED'>('ALL')
   const [expandedId, setExpandedId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!community) return
+    let active = true
+    setLoadStatus('loading')
     const fetchData = async () => {
-      const memberList = await fetchMembers(community.id)
+      const [memberList, matchesSnapshot] = await Promise.all([
+        fetchMembers(community.id),
+        getDocs(query(matchesCollection(community.id), orderBy('date', 'desc'))),
+      ])
       const playersMap = memberList.reduce((acc, m) => {
         acc[m.id] = m
         return acc
       }, {} as Record<string, Member>)
 
-      const matchesSnapshot = await getDocs(query(matchesCollection(community.id), orderBy('date', 'desc')))
       const rows = matchesSnapshot.docs.map((d) => {
         const match = { id: d.id, ...d.data() } as Match
         return {
@@ -58,10 +73,17 @@ export default function MatchesPage() {
         }
       })
 
-      setMatches(rows)
+      if (active) {
+        setMatches(rows)
+        setLoadStatus('ready')
+      }
     }
 
-    fetchData().catch(console.error)
+    fetchData().catch((error) => {
+      console.error(error)
+      if (active) setLoadStatus('error')
+    })
+    return () => { active = false }
   }, [community?.id])
 
   const filtered = useMemo(() => {
@@ -81,6 +103,7 @@ export default function MatchesPage() {
       <Header />
       <main className="page">
         <section className="page-hd">
+          <span className="history-kicker">MATCH ARCHIVE</span>
           <h1>{'\u8a66\u5408\u5c65\u6b74'}</h1>
         </section>
 
@@ -99,17 +122,31 @@ export default function MatchesPage() {
         </section>
 
         <section className="match-list">
-          {filtered.map((match) => {
+          {loadStatus === 'loading' && <div className="empty" role="status">試合履歴を読み込み中…</div>}
+          {loadStatus === 'error' && <div className="empty" role="alert">試合履歴を読み込めませんでした。ページを再読み込みしてください。</div>}
+          {loadStatus === 'ready' && filtered.map((match) => {
             const blue = match.players.filter((p) => p.team === 'BLUE')
             const red = match.players.filter((p) => p.team === 'RED')
-            const blueAvg = Math.round(blue.reduce((s, p) => s + getRateForRole(p.player, p.role), 0) / Math.max(blue.length, 1))
-            const redAvg = Math.round(red.reduce((s, p) => s + getRateForRole(p.player, p.role), 0) / Math.max(red.length, 1))
+            const beforeById = new Map(match.eloChanges?.map((change) => [change.memberId, change.before]))
+            const rateAtMatch = (p: MatchWithPlayers['players'][number]) => {
+              const elo = beforeById.get(p.player.id)
+              return getRateForRole(elo === undefined ? p.player : { ...p.player, elo }, p.role)
+            }
+            const blueAvg = Math.round(blue.reduce((s, p) => s + rateAtMatch(p), 0) / Math.max(blue.length, 1))
+            const redAvg = Math.round(red.reduce((s, p) => s + rateAtMatch(p), 0) / Math.max(red.length, 1))
             const isExpanded = expandedId === match.id
             const dateParts = fmtDate(match.date.seconds)
 
             return (
               <article key={match.id} className={`match-card ${match.winner === 'BLUE' ? 'blue-win' : 'red-win'} ${isExpanded ? 'expanded' : ''}`}>
-                <div className="match-row" onClick={() => setExpandedId((prev) => (prev === match.id ? null : match.id))}>
+                <div className="match-row" role="button" tabIndex={0} aria-expanded={isExpanded}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      setExpandedId(isExpanded ? null : match.id)
+                    }
+                  }}
+                  onClick={() => setExpandedId((prev) => (prev === match.id ? null : match.id))}>
                   <div className="match-date">
                     <span className="day">{dateParts.day}</span>
                     <span>{dateParts.time}</span>
@@ -151,7 +188,7 @@ export default function MatchesPage() {
                         <div className="detail-player" key={p.player.id}>
                           <RoleBadge role={p.role} sm />
                           <span className="detail-name">{p.player.nickname || p.player.name}</span>
-                          <span className="detail-rate">{getRateForRole(p.player, p.role)}</span>
+                          <RatingChange change={match.eloChanges?.find((change) => change.memberId === p.player.id)} fallback={getRateForRole(p.player, p.role)} />
                         </div>
                       ))}
                     </div>
@@ -162,7 +199,7 @@ export default function MatchesPage() {
                         {ROLES.map((role) => {
                           const bp = blue.find((p) => p.role === role)
                           const rp = red.find((p) => p.role === role)
-                          const diff = bp && rp ? Math.abs(getRateForRole(bp.player, role) - getRateForRole(rp.player, role)) : 0
+                          const diff = bp && rp ? Math.abs(rateAtMatch(bp) - rateAtMatch(rp)) : 0
                           return (
                             <div className="detail-diff-row" key={role}>
                               <span className="diff-role">{role}</span>
@@ -179,7 +216,7 @@ export default function MatchesPage() {
                         <div className="detail-player" key={p.player.id}>
                           <RoleBadge role={p.role} sm />
                           <span className="detail-name">{p.player.nickname || p.player.name}</span>
-                          <span className="detail-rate">{getRateForRole(p.player, p.role)}</span>
+                          <RatingChange change={match.eloChanges?.find((change) => change.memberId === p.player.id)} fallback={getRateForRole(p.player, p.role)} />
                         </div>
                       ))}
                     </div>
@@ -189,18 +226,27 @@ export default function MatchesPage() {
             )
           })}
 
-          {filtered.length === 0 && (
+          {loadStatus === 'ready' && filtered.length === 0 && (
             <div className="empty">{'\u8a72\u5f53\u3059\u308b\u8a66\u5408\u304c\u3042\u308a\u307e\u305b\u3093'}</div>
           )}
         </section>
       </main>
 
       <style dangerouslySetInnerHTML={{ __html: `
+        .detail-performance { display: block; color: var(--fg-2); }
         .page { max-width: 1440px; margin: 0 auto; padding: 28px 28px 60px; }
+        .page-hd {
+          padding: 22px 24px;
+          margin-bottom: 14px;
+          border: 1px solid var(--line);
+          border-radius: 14px;
+          background: linear-gradient(108deg, color-mix(in srgb, var(--blue) 15%, var(--bg-1)), var(--bg-1) 54%, color-mix(in srgb, var(--red) 12%, var(--bg-1)));
+        }
+        .history-kicker { color: var(--fg-1); font: 600 10px 'JetBrains Mono', monospace; letter-spacing: .18em; }
         .page-hd h1 {
-          margin: 0 0 14px;
+          margin: 4px 0 0;
           font-family: 'Space Grotesk';
-          font-size: 22px;
+          font-size: clamp(24px, 4vw, 36px);
           font-weight: 600;
           letter-spacing: -0.02em;
         }

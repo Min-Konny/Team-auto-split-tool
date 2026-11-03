@@ -1,12 +1,13 @@
 import { db } from '@/lib/firebase'
 import { isAdminConfigured, getAdminFirestore } from '@/lib/firebaseAdmin'
-import { computeEloUpdates } from '@/lib/elo'
-import { fetchMembers } from '@/lib/members'
+import { computeEloUpdates, MatchPerformance } from '@/lib/elo'
+import { parseMemberDoc } from '@/lib/parseMember'
+import { Member } from '@/types/member'
 import { matchesCollection } from '@/lib/paths'
 import { GameRole } from '@/types'
 import { MatchEloChange } from '@/types'
 import { FieldValue } from 'firebase-admin/firestore'
-import { Timestamp, doc, writeBatch } from 'firebase/firestore'
+import { Timestamp, doc, runTransaction } from 'firebase/firestore'
 
 export type MatchPlayerPayload = {
   playerId: string
@@ -14,108 +15,85 @@ export type MatchPlayerPayload = {
   team: 'BLUE' | 'RED'
 }
 
+type MatchMeta = {
+  balanceScore?: number
+  splitMode?: string
+  performance?: MatchPerformance
+  registrationId?: string
+}
+
+function prepareResult(
+  players: MatchPlayerPayload[],
+  winner: 'BLUE' | 'RED',
+  members: (Member | null)[],
+  meta?: MatchMeta
+) {
+  const inputs = players.map((p, i) => {
+    const member = members[i]
+    if (!member) throw new Error('試合参加者が見つかりません')
+    return { memberId: p.playerId, elo: member.elo, team: p.team }
+  })
+  const eloChanges = computeEloUpdates(inputs, winner, meta?.performance)
+  const updates = eloChanges.map((ch, i) => {
+    const member = members[i]!
+    const won = players[i].team === winner
+    return {
+      elo: ch.after,
+      stats: {
+        wins: (member.stats.wins ?? 0) + Number(won),
+        losses: (member.stats.losses ?? 0) + Number(!won),
+      },
+    }
+  })
+  return {
+    match: {
+      players, winner, eloChanges,
+      balanceScore: meta?.balanceScore ?? null,
+      splitMode: meta?.splitMode ?? null,
+    },
+    updates,
+  }
+}
+
 export async function registerMatchAtomic(
   communityId: string,
   winner: 'BLUE' | 'RED',
   players: MatchPlayerPayload[],
-  meta?: { balanceScore?: number; splitMode?: string }
-): Promise<{ eloChanges: MatchEloChange[]; matchId: string }> {
-  if (players.length !== 10) {
-    throw new Error('10人分のプレイヤー情報が必要です')
-  }
-
-  const members = await fetchMembers(communityId)
-  const memberMap = new Map(members.map((m) => [m.id, m]))
-
-  const eloInputs = players.map((p) => {
-    const m = memberMap.get(p.playerId)
-    if (!m) throw new Error(`メンバーが見つかりません: ${p.playerId}`)
-    return { memberId: p.playerId, elo: m.elo, team: p.team }
-  })
-
-  const eloChanges = computeEloUpdates(eloInputs, winner)
-
+  meta?: MatchMeta
+): Promise<{ eloChanges: MatchEloChange[]; matchId: string; winner: 'BLUE' | 'RED' }> {
   if (isAdminConfigured()) {
-    return registerWithAdmin(communityId, winner, players, eloChanges, memberMap, meta)
+    const adminDb = getAdminFirestore()
+    const community = adminDb.collection('communities').doc(communityId)
+    const matches = community.collection('matches')
+    const matchRef = meta?.registrationId ? matches.doc(meta.registrationId) : matches.doc()
+    const refs = players.map((p) => community.collection('members').doc(p.playerId))
+    return adminDb.runTransaction(async (tx) => {
+      const existing = (await tx.get(matchRef)).data()
+      if (existing) return { eloChanges: existing.eloChanges, matchId: matchRef.id, winner: existing.winner }
+
+      const snapshots = await tx.getAll(...refs)
+      const members = snapshots.map((snap) => parseMemberDoc(snap.id, snap.data() ?? {}))
+      const { match, updates } = prepareResult(players, winner, members, meta)
+      tx.create(matchRef, { ...match, date: FieldValue.serverTimestamp() })
+      refs.forEach((ref, i) => tx.update(ref, updates[i]))
+      return { eloChanges: match.eloChanges, matchId: matchRef.id, winner }
+    })
   }
   if (process.env.NODE_ENV === 'production') {
     throw new Error('本番では FIREBASE_SERVICE_ACCOUNT_JSON が必須です')
   }
-  return registerWithClientSdk(communityId, winner, players, eloChanges, memberMap, meta)
-}
+  const matches = matchesCollection(communityId)
+  const matchRef = meta?.registrationId ? doc(matches, meta.registrationId) : doc(matches)
+  const refs = players.map((p) => doc(db, 'communities', communityId, 'members', p.playerId))
+  return runTransaction(db, async (tx) => {
+    const existing = (await tx.get(matchRef)).data()
+    if (existing) return { eloChanges: existing.eloChanges, matchId: matchRef.id, winner: existing.winner }
 
-async function registerWithAdmin(
-  communityId: string,
-  winner: 'BLUE' | 'RED',
-  players: MatchPlayerPayload[],
-  eloChanges: ReturnType<typeof computeEloUpdates>,
-  memberMap: Map<string, { stats: { wins: number; losses: number } }>,
-  meta?: { balanceScore?: number; splitMode?: string }
-) {
-  const db = getAdminFirestore()
-  const batch = db.batch()
-  const matchRef = db.collection('communities').doc(communityId).collection('matches').doc()
-
-  batch.set(matchRef, {
-    date: FieldValue.serverTimestamp(),
-    players,
-    winner,
-    eloChanges,
-    balanceScore: meta?.balanceScore ?? null,
-    splitMode: meta?.splitMode ?? null,
+    const snapshots = await Promise.all(refs.map((ref) => tx.get(ref)))
+    const members = snapshots.map((snap) => parseMemberDoc(snap.id, snap.data() ?? {}))
+    const { match, updates } = prepareResult(players, winner, members, meta)
+    tx.set(matchRef, { ...match, date: Timestamp.now() })
+    refs.forEach((ref, i) => tx.update(ref, updates[i]))
+    return { eloChanges: match.eloChanges, matchId: matchRef.id, winner }
   })
-
-  for (const ch of eloChanges) {
-    const m = memberMap.get(ch.memberId)
-    if (!m) continue
-    const won = players.find((p) => p.playerId === ch.memberId)?.team === winner
-    const memberRef = db.collection('communities').doc(communityId).collection('members').doc(ch.memberId)
-    batch.update(memberRef, {
-      elo: ch.after,
-      stats: {
-        wins: m.stats.wins + (won ? 1 : 0),
-        losses: m.stats.losses + (won ? 0 : 1),
-      },
-    })
-  }
-
-  await batch.commit()
-  return { eloChanges, matchId: matchRef.id }
-}
-
-async function registerWithClientSdk(
-  communityId: string,
-  winner: 'BLUE' | 'RED',
-  players: MatchPlayerPayload[],
-  eloChanges: ReturnType<typeof computeEloUpdates>,
-  memberMap: Map<string, { stats: { wins: number; losses: number } }>,
-  meta?: { balanceScore?: number; splitMode?: string }
-) {
-  const batch = writeBatch(db)
-  const matchRef = doc(matchesCollection(communityId))
-
-  batch.set(matchRef, {
-    date: Timestamp.now(),
-    players,
-    winner,
-    eloChanges,
-    balanceScore: meta?.balanceScore ?? null,
-    splitMode: meta?.splitMode ?? null,
-  })
-
-  for (const ch of eloChanges) {
-    const m = memberMap.get(ch.memberId)
-    if (!m) continue
-    const won = players.find((p) => p.playerId === ch.memberId)?.team === winner
-    batch.update(doc(db, 'communities', communityId, 'members', ch.memberId), {
-      elo: ch.after,
-      stats: {
-        wins: m.stats.wins + (won ? 1 : 0),
-        losses: m.stats.losses + (won ? 0 : 1),
-      },
-    })
-  }
-
-  await batch.commit()
-  return { eloChanges, matchId: matchRef.id }
 }

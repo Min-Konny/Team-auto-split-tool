@@ -66,6 +66,8 @@ export interface MatchEloChange {
   before: number
   after: number
   delta: number
+  performance?: 'MVP' | 'PENALTY'
+  performanceDelta?: number
 }
 
 export interface Match {

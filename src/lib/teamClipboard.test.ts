@@ -11,15 +11,16 @@ const m = (name: string, id: string): Member =>
     name,
     nickname: name,
     elo: 1500,
+    stats: { wins: 0, losses: 0 },
     mainRole: GameRole.MID,
     roles: {
-      [GameRole.TOP]: 'C',
-      [GameRole.JUNGLE]: 'C',
-      [GameRole.MID]: 'A',
-      [GameRole.ADC]: 'C',
-      [GameRole.SUP]: 'C',
+      [GameRole.TOP]: 'OK',
+      [GameRole.JUNGLE]: 'OK',
+      [GameRole.MID]: 'MAIN',
+      [GameRole.ADC]: 'OK',
+      [GameRole.SUP]: 'OK',
     },
-  }) as Member
+  })
 
 describe('formatTeamsForChat', () => {
   it('formats lane rows with RED on the left', () => {

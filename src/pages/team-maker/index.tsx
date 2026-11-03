@@ -16,6 +16,8 @@ import {
   toggleLobbyCheckIn,
 } from '@/lib/lobby'
 import { fetchLastMatchPlayerIds } from '@/lib/lastMatch'
+import type { MatchPerformance } from '@/lib/elo'
+import type { MatchEloChange } from '@/types'
 import { fetchMembers } from '@/lib/members'
 import { getStoredActiveLobbyId, setStoredActiveLobbyId } from '@/lib/memberSession'
 import { generateThreeCandidates, SplitCandidate, Teams } from '@/lib/teamBalancer'
@@ -61,6 +63,10 @@ export default function TeamMakerPage() {
   const [result, setResult] = useState<'BLUE' | 'RED' | null>(null)
   const [justAdded, setJustAdded] = useState<string | null>(null)
   const [swapSource, setSwapSource] = useState<{ team: 'blue' | 'red'; idx: number; id: string } | null>(null)
+  const [eloChanges, setEloChanges] = useState<MatchEloChange[]>([])
+  const [performance, setPerformance] = useState<MatchPerformance>({})
+  const registrationId = useRef<string>()
+  const registrationBusy = useRef(false)
   const [registering, setRegistering] = useState(false)
   const [registerError, setRegisterError] = useState<string | null>(null)
   const [revealKey, setRevealKey] = useState(0)
@@ -131,6 +137,7 @@ export default function TeamMakerPage() {
 
   // ロビーが10人揃ったら選択に反映（入室ログ貼付・リンク参加など）
   useEffect(() => {
+    if (showOverlay) return
     const count = lobby?.checkInIds.length ?? 0
     if (count < 10 || members.length === 0) {
       if (count < 10) lastLobbyKeyRef.current = null
@@ -140,7 +147,7 @@ export default function TeamMakerPage() {
     if (key === lastLobbyKeyRef.current) return
     lastLobbyKeyRef.current = key
     applyLobbyToSelected(lobby!.checkInIds)
-  }, [lobby?.checkInIds, members.length, applyLobbyToSelected])
+  }, [lobby?.checkInIds, members.length, applyLobbyToSelected, showOverlay])
 
   const handlePoolClick = async (member: Member, e: React.MouseEvent) => {
     if (!member.id) return
@@ -228,16 +235,24 @@ export default function TeamMakerPage() {
 
   const removePlayer = (idx: number) => setSelected((prev) => prev.filter((_, i) => i !== idx))
 
+  const resetMatchResult = useCallback(() => {
+    setResult(null)
+    setEloChanges([])
+    setPerformance({})
+    setRegisterError(null)
+    registrationId.current = undefined
+  }, [])
+
   const runSplit = useCallback((list: SplitCandidate[]) => {
     setCandidates(list)
     setActiveCandidate(0)
-    setResult(null)
+    resetMatchResult()
     setSwapSource(null)
     setTeams(null)
     setShuffling(false)
     setShowOverlay(false)
     setShowModePicker(true)
-  }, [])
+  }, [resetMatchResult])
 
   const applySplitMode = useCallback(
     (index: number) => {
@@ -245,7 +260,7 @@ export default function TeamMakerPage() {
       setShowModePicker(false)
       setActiveCandidate(index)
       setSwapSource(null)
-      setResult(null)
+      resetMatchResult()
       setShowOverlay(true)
       setRevealKey((k) => k + 1)
       setShuffling(true)
@@ -254,7 +269,7 @@ export default function TeamMakerPage() {
         setShuffling(false)
       }, 650)
     },
-    [candidates]
+    [candidates, resetMatchResult]
   )
 
   const runTeamSplit = useCallback(
@@ -276,7 +291,9 @@ export default function TeamMakerPage() {
     [runSplit]
   )
 
-  const createTeams = () => runTeamSplit(selected.map((s) => s.member), true)
+  const createTeams = () => {
+    if (!registrationBusy.current) runTeamSplit(selected.map(({ member }) => member), true)
+  }
 
   // 10人揃ったら自動チーム分け / 10人未満ならリセット
   useEffect(() => {
@@ -286,23 +303,23 @@ export default function TeamMakerPage() {
       setShowModePicker(false)
       setTeams(null)
       setCandidates(null)
-      setResult(null)
+      resetMatchResult()
       return
     }
     runTeamSplit(selected.map((s) => s.member))
-  }, [selected, runTeamSplit])
+  }, [selected, runTeamSplit, resetMatchResult])
 
   const pickCandidate = (index: number) => {
-    if (!candidates?.[index]) return
+    if (!candidates?.[index] || registrationId.current || result) return
     setActiveCandidate(index)
     setTeams(candidates[index].teams)
     setSwapSource(null)
-    setResult(null)
+    resetMatchResult()
     setRevealKey((k) => k + 1)
   }
 
   const handleSwapClick = (team: 'blue' | 'red', idx: number) => {
-    if (!teams) return
+    if (!teams || registrationId.current || result) return
     const tp = teams[team][idx]
     if (!tp) return
 
@@ -332,7 +349,9 @@ export default function TeamMakerPage() {
   const remain = 10 - selected.length
 
   const registerMatch = async (winner: 'BLUE' | 'RED') => {
-    if (!teams || registering || result !== null || !community) return
+    if (!teams || registrationBusy.current || result !== null || !community) return
+    registrationId.current ??= crypto.randomUUID()
+    registrationBusy.current = true
     setRegistering(true)
     setRegisterError(null)
     try {
@@ -347,6 +366,8 @@ export default function TeamMakerPage() {
         body: JSON.stringify({
           winner,
           players,
+          performance,
+          registrationId: registrationId.current,
           balanceScore: candidates?.[activeCandidate]?.metrics.balanceScore,
           splitMode: candidates?.[activeCandidate]?.mode,
         }),
@@ -354,13 +375,22 @@ export default function TeamMakerPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || '登録に失敗しました')
 
-      const refreshed = await fetchMembers(community.id)
-      setMembers(refreshed)
-      setResult(winner)
+      const changes: MatchEloChange[] = data.eloChanges
+      const byId = new Map(changes.map((change) => [change.memberId, change.after]))
+      const updateElo = (member: Member) => {
+        const elo = byId.get(member.id)
+        return elo === undefined ? member : { ...member, elo }
+      }
+      setMembers((current) => current.map(updateElo))
+      setSelected((current) => current.map(({ member }) => ({ member: updateElo(member) })))
+      setSwapSource(null)
+      setEloChanges(changes)
+      setResult(data.winner ?? winner)
     } catch (e) {
       console.error('試合結果の登録に失敗しました:', e)
       setRegisterError(e instanceof Error ? e.message : '登録に失敗しました。再度お試しください。')
     } finally {
+      registrationBusy.current = false
       setRegistering(false)
     }
   }
@@ -428,7 +458,7 @@ export default function TeamMakerPage() {
           <div className="search-area">
             <div className="search-row">
               <svg className="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></svg>
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="名前で検索…" />
+              <input aria-label="プレイヤー名で検索" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="名前で検索…" />
             </div>
           </div>
           <div className="panel-body">
@@ -436,7 +466,9 @@ export default function TeamMakerPage() {
               const inLobby = p.id != null && checkInSet.has(p.id)
               const inRoster = isSelected(p.id)
               return (
-              <div
+              <button
+                type="button"
+                aria-pressed={inRoster}
                 key={p.id}
                 className={`pool-card${inRoster ? ' pool-selected' : ''}${inLobby ? ' pool-lobby' : ''}${justAdded === p.id ? ' just-added' : ''}`}
                 onClick={(e) => handlePoolClick(p, e)}
@@ -454,7 +486,7 @@ export default function TeamMakerPage() {
                 ) : (
                   <div className="add-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 5v14M5 12h14" /></svg></div>
                 )}
-              </div>
+              </button>
             )})}
           </div>
         </section>
@@ -481,7 +513,7 @@ export default function TeamMakerPage() {
                     {sp.member.nickname && <div className="rs-sname">{sp.member.name}</div>}
                   </div>
                   <div className="rs-rates"><span>ELO<strong>{sp.member.elo}</strong></span></div>
-                  <button className="remove-btn" onClick={() => removePlayer(i)}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg></button>
+                  <button type="button" aria-label={`${sp.member.nickname || sp.member.name}を外す`} className="remove-btn" onClick={() => removePlayer(i)}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg></button>
                 </div>
               </div>
             ))}
@@ -533,9 +565,12 @@ export default function TeamMakerPage() {
             shuffling={shuffling}
             swapSource={swapSource}
             result={result}
+            eloChanges={eloChanges}
+            performance={performance}
+            onPerformance={setPerformance}
             registering={registering}
             registerError={registerError}
-            onClose={() => setShowOverlay(false)}
+            onClose={() => { if (!registrationBusy.current) setShowOverlay(false) }}
             onRegenerate={createTeams}
             onPickCandidate={pickCandidate}
             onSwapClick={handleSwapClick}
@@ -585,7 +620,7 @@ export default function TeamMakerPage() {
         .search-row{position:relative}
         .search-row input{width:100%;padding:9px 12px 9px 36px;background:var(--bg-1);border:1px solid var(--line);border-radius:9px;color:var(--fg-0);font-size:13.5px;outline:none}
         .search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--fg-3)}
-        .pool-card{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid transparent;margin-bottom:5px;background:var(--bg-1);transition:all .12s;cursor:pointer}
+        .pool-card{width:100%;text-align:left;color:inherit;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1px solid transparent;margin-bottom:5px;background:var(--bg-1);transition:all .12s;cursor:pointer}
         .pool-card:hover:not(.pool-selected){background:var(--bg-2);border-color:var(--line);transform:translateX(2px)}
         .pool-card.pool-selected{opacity:.38;cursor:not-allowed}
         .pool-card.just-added{animation:addedFlash .4s ease}
@@ -642,13 +677,24 @@ export default function TeamMakerPage() {
         .rr-role-btn{font-family:'JetBrains Mono';font-size:11px;font-weight:600;padding:6px 10px;border-radius:8px;width:84px;text-align:center;background:var(--bg-2);border:1px solid var(--line)}
         .rr-diff{font-family:'JetBrains Mono';font-size:12px;font-weight:600;padding:3px 8px;border-radius:5px}
         .rr-diff.ok{background:color-mix(in oklch,var(--ok) 15%,transparent);color:var(--ok)}.rr-diff.warn{background:color-mix(in oklch,var(--warn) 15%,transparent);color:var(--warn)}
-        .result-bar{border-top:1px solid var(--line);padding:14px 28px;display:flex;align-items:center;gap:10px}
+        .result-bar{flex-shrink:0;flex-wrap:wrap;background:var(--bg-0);border-top:1px solid var(--line);padding:14px 28px;display:flex;align-items:center;gap:10px}
         .res-lbl{font-family:'JetBrains Mono';font-size:11px;color:var(--fg-3)}.win-btn{flex:1;padding:14px;border-radius:11px;border:1px solid var(--line);background:transparent;font-family:'Space Grotesk';font-weight:700;font-size:16px;cursor:pointer;transition:all .15s}
         .win-btn.blue{color:var(--blue)}.win-btn.red{color:var(--red)}.win-btn.won-blue{background:color-mix(in oklch,var(--blue) 22%,transparent);border-color:var(--blue)}.win-btn.won-red{background:color-mix(in oklch,var(--red) 22%,transparent);border-color:var(--red)}
-        .win-btn:disabled{opacity:.35;cursor:not-allowed}
+        .win-btn:disabled:not(.won-blue):not(.won-red){opacity:.35;cursor:not-allowed}
         .reg-error{font-family:'JetBrains Mono';font-size:11px;color:var(--warn)}
         .draft-btn{display:flex;align-items:center;justify-content:center;padding:14px 22px;border-radius:11px;border:1px solid var(--line-2);background:transparent;color:var(--fg-1);font-family:'Space Grotesk';font-weight:600;font-size:15px;text-decoration:none;white-space:nowrap}
-        @media (max-width:1100px){.page-layout{grid-template-columns:1fr;height:auto;padding-bottom:68px}.footer-inner{padding:10px 14px;height:auto;flex-wrap:wrap}.role-row{grid-template-columns:1fr}.ov-help{display:none}}
+        @media (max-width:640px){
+          .ov-hd,.ov-body,.result-bar,.cand-tabs-wrap{padding-left:12px;padding-right:12px}
+          .ov-hd{flex-wrap:wrap;gap:8px}.ov-actions{gap:4px}.copy-btn,.regen-btn{padding:7px}
+          .ov-stat-side{padding:8px;gap:6px;flex-wrap:wrap}.ov-stat-mid{padding:0 6px}
+          .sv{font-size:17px}.sk{font-size:8px}
+          .role-row{grid-template-columns:minmax(0,1fr) 48px minmax(0,1fr);gap:4px}
+          .rr-card{padding:8px;gap:4px}.rr-role-btn{width:48px;padding:4px;font-size:9px}
+          .rr-name,.rr-rate{font-size:14px}.rr-sub{display:none}.rr-diff{padding:2px;font-size:10px}
+          .result-bar{gap:6px}.win-btn,.draft-btn{padding:9px 6px;font-size:13px}
+          .res-lbl,.reg-error{flex-basis:100%}
+        }
+        @media (max-width:1100px){.page-layout{grid-template-columns:1fr;height:auto;padding-bottom:68px}.footer-inner{padding:10px 14px;height:auto;flex-wrap:wrap}.ov-help{display:none}}
       ` }} />
     </div>
   )
