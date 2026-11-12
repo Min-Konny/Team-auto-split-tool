@@ -396,7 +396,7 @@ export default function TeamSplitOverlay({
                   aria-disabled={!!result || registering}
                   aria-label={`${bTp?.member.nickname || bTp?.member.name || 'プレイヤー'}を選択して入れ替え`}
                   onKeyDown={(event) => {
-                    if (!result && !registering && (event.key === 'Enter' || event.key === ' ')) {
+                    if (event.target === event.currentTarget && !result && !registering && (event.key === 'Enter' || event.key === ' ')) {
                       event.preventDefault()
                       if (bIdx >= 0) handleSwapClick('blue', bIdx)
                     }
@@ -437,7 +437,7 @@ export default function TeamSplitOverlay({
                   aria-disabled={!!result || registering}
                   aria-label={`${rTp?.member.nickname || rTp?.member.name || 'プレイヤー'}を選択して入れ替え`}
                   onKeyDown={(event) => {
-                    if (!result && !registering && (event.key === 'Enter' || event.key === ' ')) {
+                    if (event.target === event.currentTarget && !result && !registering && (event.key === 'Enter' || event.key === ' ')) {
                       event.preventDefault()
                       if (rIdx >= 0) handleSwapClick('red', rIdx)
                     }
