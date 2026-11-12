@@ -26,7 +26,7 @@ function RatingChange({ change, fallback }: { change?: MatchEloChange; fallback:
   if (!change) return <span className="detail-rate">{fallback}</span>
   return (
     <span className="detail-rate">
-      {change.before} → {change.after} ({change.delta > 0 ? '+' : ''}{change.delta})
+      {change.before} → {change.after} <strong className={change.delta < 0 ? 'rating-negative' : 'rating-positive'}>({change.delta > 0 ? '+' : ''}{change.delta})</strong>
       {change.performance && <small className="detail-performance">{change.performance === 'MVP' ? 'MVP +' : '下方補正 '}{change.performanceDelta}</small>}
     </span>
   )
@@ -104,15 +104,15 @@ export default function MatchesPage() {
       <main className="page">
         <section className="page-hd">
           <span className="history-kicker">MATCH ARCHIVE</span>
-          <h1>{'\u8a66\u5408\u5c65\u6b74'}</h1>
+          <h1>試合履歴</h1><p>勝敗とレート変動を振り返る</p>
         </section>
 
         <section className="stats">
-          <div className="stat-cell"><div className="stat-k">Total Matches</div><div className="stat-v">{stats.total}</div></div>
-          <div className="stat-cell"><div className="stat-k">Blue Wins</div><div className="stat-v blue">{stats.blueWins}</div></div>
-          <div className="stat-cell"><div className="stat-k">Red Wins</div><div className="stat-v red">{stats.redWins}</div></div>
-          <div className="stat-cell"><div className="stat-k">Blue Win Rate</div><div className="stat-v">{stats.total ? Math.round((stats.blueWins / stats.total) * 100) : 0}%</div></div>
-          <div className="stat-cell"><div className="stat-k">Last Match</div><div className="stat-v last">{stats.last ? fmtDate(stats.last.date.seconds).full : '-'}</div></div>
+          <div className="stat-cell"><div className="stat-k">総試合数</div><div className="stat-v">{stats.total}</div></div>
+          <div className="stat-cell"><div className="stat-k">BLUE WIN</div><div className="stat-v blue">{stats.blueWins}</div></div>
+          <div className="stat-cell"><div className="stat-k">RED WIN</div><div className="stat-v red">{stats.redWins}</div></div>
+          <div className="stat-cell"><div className="stat-k">BLUE 勝率</div><div className="stat-v">{stats.total ? Math.round((stats.blueWins / stats.total) * 100) : 0}%</div></div>
+          <div className="stat-cell"><div className="stat-k">最新の試合</div><div className="stat-v last">{stats.last ? fmtDate(stats.last.date.seconds).full : '-'}</div></div>
         </section>
 
         <section className="filter-bar">

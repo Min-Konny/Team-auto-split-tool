@@ -13,4 +13,8 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig 
+module.exports = (phase) => ({
+  ...nextConfig,
+  // Keep a running local preview independent from production build output.
+  distDir: phase === 'phase-development-server' ? '.next-dev' : '.next',
+})

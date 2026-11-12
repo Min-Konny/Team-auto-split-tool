@@ -31,19 +31,20 @@ const MODE_META: Record<
 type Props = {
   candidates: SplitCandidate[]
   open: boolean
+  inline?: boolean
   onPick: (index: number) => void
   onClose: () => void
 }
 
 const ease = [0.22, 1, 0.36, 1] as const
 
-export default function SplitModePickerModal({ candidates, open, onPick, onClose }: Props) {
+export default function SplitModePickerModal({ candidates, open, onPick, onClose, inline = false }: Props) {
   const reduced = useReducedMotion()
 
   if (!open) return null
 
   return (
-    <div className="mode-overlay" role="dialog" aria-modal="true" aria-labelledby="split-mode-title">
+    <div className="mode-overlay" role={inline ? 'region' : 'dialog'} aria-modal={inline ? undefined : true} aria-labelledby="split-mode-title">
       <motion.div
         className="mode-modal"
         initial={reduced ? false : { opacity: 0, y: 24, scale: 0.96 }}

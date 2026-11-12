@@ -391,7 +391,17 @@ export default function TeamSplitOverlay({
                   className={`rr-card blue-card${isSrcBlue ? ' is-source' : ''}${swapSource && !isSrcBlue ? ' is-target' : ''}${showSwapHint && !swapSource ? ' swap-hint-pulse' : ''}`}
                   layout={!reduced}
                   {...cardMotion('blue', i)}
-                  onClick={() => bIdx >= 0 && handleSwapClick('blue', bIdx)}
+                  role="button"
+                  tabIndex={result || registering ? -1 : 0}
+                  aria-disabled={!!result || registering}
+                  aria-label={`${bTp?.member.nickname || bTp?.member.name || 'プレイヤー'}を選択して入れ替え`}
+                  onKeyDown={(event) => {
+                    if (!result && !registering && (event.key === 'Enter' || event.key === ' ')) {
+                      event.preventDefault()
+                      if (bIdx >= 0) handleSwapClick('blue', bIdx)
+                    }
+                  }}
+                  onClick={() => !result && !registering && bIdx >= 0 && handleSwapClick('blue', bIdx)}
                   title="クリックで選択・入れ替え"
                 >
                   <span className="rr-swap-icon" aria-hidden>
@@ -422,7 +432,17 @@ export default function TeamSplitOverlay({
                   className={`rr-card red-card${isSrcRed ? ' is-source' : ''}${swapSource && !isSrcRed ? ' is-target' : ''}${showSwapHint && !swapSource ? ' swap-hint-pulse' : ''}`}
                   layout={!reduced}
                   {...cardMotion('red', i)}
-                  onClick={() => rIdx >= 0 && handleSwapClick('red', rIdx)}
+                  role="button"
+                  tabIndex={result || registering ? -1 : 0}
+                  aria-disabled={!!result || registering}
+                  aria-label={`${rTp?.member.nickname || rTp?.member.name || 'プレイヤー'}を選択して入れ替え`}
+                  onKeyDown={(event) => {
+                    if (!result && !registering && (event.key === 'Enter' || event.key === ' ')) {
+                      event.preventDefault()
+                      if (rIdx >= 0) handleSwapClick('red', rIdx)
+                    }
+                  }}
+                  onClick={() => !result && !registering && rIdx >= 0 && handleSwapClick('red', rIdx)}
                   title="クリックで選択・入れ替え"
                 >
                   <span className="rr-swap-icon" aria-hidden>

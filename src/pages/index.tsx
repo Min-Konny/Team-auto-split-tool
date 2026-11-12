@@ -9,54 +9,6 @@ const actions = [
   { href: '/matches', num: '03 / ARCHIVE', title: '試合履歴', desc: '勝敗とレート変動、MVPなどの個人補正を振り返る。', cta: 'MATCH HISTORY', cls: 'match' },
 ]
 
-const lanes = 'M96 308 L96 131 Q96 94 134 94 H314 M96 308 H268 Q314 308 314 267 V94 M96 308 L314 94'
-const blueNodes = [[96, 241], [96, 175], [149, 256], [196, 308], [237, 308]]
-const redNodes = [[314, 159], [314, 226], [262, 145], [209, 94], [173, 94]]
-
-function RiftMap() {
-  return (
-    <div className="rift-map" aria-hidden="true">
-      <svg viewBox="0 0 410 400" fill="none">
-        <defs>
-          <pattern id="rift-grid" width="20" height="20" patternUnits="userSpaceOnUse">
-            <path d="M20 0H0V20" stroke="#b1c3dc" strokeOpacity=".13" />
-          </pattern>
-          <linearGradient id="rift-map-tone" x1="75" y1="320" x2="335" y2="75" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#17395c" /><stop offset=".48" stopColor="#101626" /><stop offset="1" stopColor="#49232d" />
-          </linearGradient>
-          <linearGradient id="rift-lanes" x1="96" y1="308" x2="314" y2="94" gradientUnits="userSpaceOnUse">
-            <stop stopColor="#6bcfff" /><stop offset=".5" stopColor="#b8bdcd" /><stop offset="1" stopColor="#ff8c98" />
-          </linearGradient>
-          <filter id="rift-glow" x="-100%" y="-100%" width="300%" height="300%">
-            <feGaussianBlur stdDeviation="4" result="blur" /><feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
-          </filter>
-        </defs>
-        <path d="M77 59H305L351 105V328L329 350H100L59 309V82Z" fill="url(#rift-map-tone)" stroke="#68778d" strokeOpacity=".7" />
-        <path d="M77 59H305L351 105V328L329 350H100L59 309V82Z" fill="url(#rift-grid)" />
-        <path d="M76 80L110 120 158 142 191 179 228 214 265 257 317 279 348 318" stroke="#536880" strokeOpacity=".34" strokeWidth="24" />
-        <path d="M76 80L110 120 158 142 191 179 228 214 265 257 317 279 348 318" stroke="#9db2ce" strokeOpacity=".4" strokeDasharray="4 8" />
-        <path d={lanes} stroke="#080c15" strokeWidth="15" strokeLinejoin="round" />
-        <path d={lanes} stroke="url(#rift-lanes)" strokeWidth="2" />
-        <path d="M111 201L142 167 164 179 128 219ZM192 144L208 114 252 121 224 152ZM221 253L188 281 157 277 189 249ZM280 199L295 181 302 214 277 236Z" stroke="#a9b8cb" strokeOpacity=".28" fill="#899cb2" fillOpacity=".09" />
-        <g fill="#8edbff" filter="url(#rift-glow)">
-          {blueNodes.map(([x, y]) => <circle key={x + ':' + y} cx={x} cy={y} r="3" />)}
-          <path d="M96 294L110 308 96 322 82 308Z" />
-        </g>
-        <g fill="#ff929e" filter="url(#rift-glow)">
-          {redNodes.map(([x, y]) => <circle key={x + ':' + y} cx={x} cy={y} r="3" />)}
-          <path d="M314 80L328 94 314 108 300 94Z" />
-        </g>
-        <circle cx="205" cy="201" r="29" stroke="#dcc58f" strokeOpacity=".48" strokeDasharray="2 5" />
-        <circle cx="205" cy="201" r="19" fill="#111521" stroke="#dcc58f" />
-        <text x="205" y="206" textAnchor="middle" fill="#f3dca9" fontSize="12" fontWeight="700">VS</text>
-      </svg>
-      <span className="map-label map-red"><i /> RED SIDE</span>
-      <span className="map-label map-blue"><i /> BLUE SIDE</span>
-      <span className="map-index">01 / SUMMONER’S RIFT</span>
-    </div>
-  )
-}
-
 export default function Home() {
   const reduced = useReducedMotion()
   return (
@@ -67,12 +19,11 @@ export default function Home() {
           <div className="rift-wrap rift-stage">
             <div className="rift-copy">
               <p className="rift-eyebrow"><span /> LEAGUE OF LEGENDS / CUSTOM 5V5</p>
-              <h1>RIFT<span>.</span><br /><em>TEAM MAKER</em></h1>
-              <p className="rift-lede">いつもの10人で、次の一戦へ。</p>
+              <h1>いつもの10人で、<br />次の一戦へ。</h1>
               <p className="rift-desc">レートと希望ロールからチームを自動編成。<br />試合が終わったら、勝敗とレート変動を記録。</p>
               <Link href="/team-maker" className="rift-start">チームを作成 <span aria-hidden="true">↗</span></Link>
             </div>
-            <RiftMap />
+            <div className="rift-art-credit" aria-hidden="true">SUMMONER’S RIFT<br /><span>BLUE × RED / 5V5</span></div>
           </div>
           <div className="rift-wrap rift-strip">
             <span><b>01</b> メンバーを選ぶ</span><span><b>02</b> チームを分ける</span><span><b>03</b> 勝敗を記録する</span>

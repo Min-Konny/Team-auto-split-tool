@@ -1,41 +1,22 @@
 :root {
-  --bg-0: oklch(0.16 0.02 250);
-  --bg-1: oklch(0.20 0.022 250);
-  --bg-2: oklch(0.24 0.024 250);
-  --bg-3: oklch(0.28 0.026 250);
-  --line: oklch(0.30 0.02 250);
-  --line-2: oklch(0.40 0.025 250);
-  --fg-0: oklch(0.96 0.01 250);
-  --fg-1: oklch(0.78 0.015 250);
-  --fg-2: oklch(0.58 0.018 250);
-  --fg-3: oklch(0.42 0.02 250);
-  --blue: oklch(0.72 0.16 240);
-  --blue-d: oklch(0.42 0.14 240);
-  --blue-bg: oklch(0.22 0.07 240);
-  --red: oklch(0.68 0.20 25);
-  --red-d: oklch(0.42 0.17 25);
-  --red-bg: oklch(0.22 0.10 25);
-  --gold: oklch(0.82 0.13 85);
-  --ok: oklch(0.76 0.16 145);
-  --warn: oklch(0.78 0.15 65);
-  --r-top: oklch(0.72 0.18 25);
-  --r-jng: oklch(0.76 0.16 145);
-  --r-mid: oklch(0.72 0.16 240);
-  --r-adc: oklch(0.72 0.18 305);
-  --r-sup: oklch(0.80 0.15 70);
+  color-scheme: dark;
+  --bg-0:#06131e; --bg-1:#0b1e2b; --bg-2:#112b3b; --bg-3:#19394b;
+  --line:#294552; --line-2:#7d7355;
+  --fg-0:#f4f0e5; --fg-1:#d3dfe1; --fg-2:#abbec6; --fg-3:#92a8b4;
+  --blue:#37d6ee; --blue-d:#176c84; --blue-bg:#092d40;
+  --red:#ff8792; --red-d:#a14756; --red-bg:#361e2a;
+  --gold:#e7c779; --ok:#89ddba; --warn:#f1ce81;
+  --r-top:#e7c779; --r-jng:#9bd6ab; --r-mid:#bba7ed; --r-adc:#71d9f1; --r-sup:#f2a6b4;
+  --gold-line:#887449;
+  --panel-shadow:0 16px 42px #0003,inset 0 1px 0 #ffffff06;
 }
-
-* {
-  box-sizing: border-box;
-}
-
-html, body {
-  margin: 0;
-  padding: 0;
-}
-
-body {
-  background: var(--bg-0);
-  color: var(--fg-0);
-  -webkit-font-smoothing: antialiased;
-}
+* { box-sizing:border-box; }
+html,body { margin:0; padding:0; }
+body { background:var(--bg-0); color:var(--fg-0); -webkit-font-smoothing:antialiased; }
+button,input,select,textarea { font:inherit; }
+button:not(:disabled),summary { cursor:pointer; }
+button:disabled { cursor:not-allowed; }
+input::placeholder,textarea::placeholder { color:var(--fg-3); opacity:1; }
+:focus-visible { outline:2px solid var(--gold); outline-offset:4px; }
+button,input,select,textarea,a { -webkit-tap-highlight-color:transparent; }
+::selection { background:#e7c77944; color:var(--fg-0); }
