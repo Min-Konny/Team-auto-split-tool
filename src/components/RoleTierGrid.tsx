@@ -46,6 +46,8 @@ export default function RoleTierGrid({ roles, onChange }: Props) {
             <button
               key={tier}
               type="button"
+              aria-pressed={roles[role] === tier}
+              aria-label={`${role} ${ROLE_TIER_LABEL[tier]}`}
               className={`rtg-cell${roles[role] === tier ? ' on' : ''}`}
               onClick={() => setTier(role, tier)}
             >

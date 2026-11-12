@@ -470,7 +470,11 @@ export default function TeamMakerPage() {
           </p>
         )}
       </section>
-      <div className="page-layout">
+      <div className="team-page-heading">
+        <h1>{showModePicker || showOverlay ? 'チームを編成' : '参加者を選択'}</h1>
+        <p>10人揃うと、自動でチーム分け候補を作成します</p>
+      </div>
+      <main className={`page-layout${showModePicker || showOverlay ? ' has-composition' : ''}`}>
         <section className="panel">
           <div className="panel-hd">
             <h2>プレイヤー</h2>
@@ -483,7 +487,7 @@ export default function TeamMakerPage() {
               <input aria-label="プレイヤー名で検索" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="名前で検索…" />
             </div>
           </div>
-          <div className="panel-body">
+          <div className="panel-body pool-list">
             {filtered.map((p) => {
               const inLobby = p.id != null && checkInSet.has(p.id)
               const inRoster = isSelected(p.id)
@@ -491,6 +495,7 @@ export default function TeamMakerPage() {
               <button
                 type="button"
                 aria-pressed={inRoster}
+                disabled={registering}
                 key={p.id}
                 className={`pool-card${inRoster ? ' pool-selected' : ''}${inLobby ? ' pool-lobby' : ''}${justAdded === p.id ? ' just-added' : ''}`}
                 onClick={(e) => handlePoolClick(p, e)}
@@ -513,63 +518,12 @@ export default function TeamMakerPage() {
           </div>
         </section>
 
-        <section className="panel right-panel">
-          <div className="panel-hd">
-            <h2>選択中</h2>
-            <span className="count" style={{ color: remain === 0 ? 'var(--ok)' : 'var(--fg-3)' }}>{selected.length} / 10</span>
-          </div>
-          <div className="panel-body">
-            {selected.length === 0 && (
-              <div className="empty-msg">
-                左のリストから10人選ぶと自動でチーム分け<br />
-                <span className="empty-sub">ロビー・入室ログ貼付で10人揃っても同様</span>
-              </div>
-            )}
-            {selected.map((sp, i) => (
-              <div className="roster-slot" key={sp.member.id}>
-                <div className="rs-row">
-                  <span className="roster-num">{String(i + 1).padStart(2, '0')}</span>
-                  <RoleBadge role={sp.member.mainRole} />
-                  <div className="rs-name-block">
-                    <div className="rs-pname">{sp.member.nickname || sp.member.name}</div>
-                    {sp.member.nickname && <div className="rs-sname">{sp.member.name}</div>}
-                  </div>
-                  <div className="rs-rates"><span>ELO<strong>{sp.member.elo}</strong></span></div>
-                  <button type="button" aria-label={`${sp.member.nickname || sp.member.name}を外す`} className="remove-btn" onClick={() => removePlayer(i)}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg></button>
-                </div>
-              </div>
-            ))}
-            {selected.length > 0 &&
-              Array.from({ length: Math.max(0, 10 - selected.length) }, (_, i) => (
-                <div className="empty-slot" key={i}>{String(selected.length + i + 1).padStart(2, '0')} · プレイヤーを選択</div>
-              ))}
-          </div>
-        </section>
-      </div>
-
-      <div className="action-footer">
-        <div className="footer-inner">
-          <div className="progress-wrap">
-            <div className="prog-dots">{Array.from({ length: 10 }, (_, i) => <div key={i} className={`prog-dot${i < selected.length ? i < 5 ? ' blue' : ' red' : ''}`} />)}</div>
-            <span className="prog-text"><span className="prog-n">{selected.length}/10</span>{remain > 0 ? <span className="prog-remain">— あと{remain}人</span> : <span className="ready">準備完了</span>}</span>
-          </div>
-          <div className="spacer" />
-          {teams && !showOverlay && (
-            <button type="button" className="btn-primary" onClick={() => setShowOverlay(true)}>
-              チーム表示
-            </button>
-          )}
-          {candidates && !teams && !showModePicker && (
-            <button type="button" className="btn-primary" onClick={() => setShowModePicker(true)}>
-              分け方を選ぶ
-            </button>
-          )}
-        </div>
-      </div>
-
+        {(showModePicker || (showOverlay && teams)) ? (
+          <section className="composition-panel" aria-label="チーム編成">
       {candidates && (
         <SplitModePickerModal
           candidates={candidates}
+          inline
           open={showModePicker}
           onPick={applySplitMode}
           onClose={() => setShowModePicker(false)}
@@ -602,6 +556,64 @@ export default function TeamMakerPage() {
           />
         </AnimatePresence>
       )}
+
+
+          </section>
+        ) : (
+        <section className="panel right-panel">
+          <div className="panel-hd">
+            <h2>選択中</h2>
+            <span className="count" style={{ color: remain === 0 ? 'var(--ok)' : 'var(--fg-3)' }}>{selected.length} / 10</span>
+          </div>
+          <div className="panel-body roster-list">
+            {selected.length === 0 && (
+              <div className="empty-msg">
+                左のリストから10人選ぶと自動でチーム分け<br />
+                <span className="empty-sub">ロビー・入室ログ貼付で10人揃っても同様</span>
+              </div>
+            )}
+            {selected.map((sp, i) => (
+              <div className="roster-slot" key={sp.member.id}>
+                <div className="rs-row">
+                  <span className="roster-num">{String(i + 1).padStart(2, '0')}</span>
+                  <RoleBadge role={sp.member.mainRole} />
+                  <div className="rs-name-block">
+                    <div className="rs-pname">{sp.member.nickname || sp.member.name}</div>
+                    {sp.member.nickname && <div className="rs-sname">{sp.member.name}</div>}
+                  </div>
+                  <div className="rs-rates"><span>ELO<strong>{sp.member.elo}</strong></span></div>
+                  <button type="button" aria-label={`${sp.member.nickname || sp.member.name}を外す`} className="remove-btn" disabled={registering} onClick={() => removePlayer(i)}><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg></button>
+                </div>
+              </div>
+            ))}
+            {selected.length > 0 &&
+              Array.from({ length: Math.max(0, 10 - selected.length) }, (_, i) => (
+                <div className="empty-slot" key={i}>{String(selected.length + i + 1).padStart(2, '0')} · プレイヤーを選択</div>
+              ))}
+          </div>
+        </section>
+        )}
+      </main>
+
+      <div className="action-footer">
+        <div className="footer-inner">
+          <div className="progress-wrap">
+            <div className="prog-dots">{Array.from({ length: 10 }, (_, i) => <div key={i} className={`prog-dot${i < selected.length ? i < 5 ? ' blue' : ' red' : ''}`} />)}</div>
+            <span className="prog-text" role="status" aria-live="polite"><span className="prog-n">{selected.length}/10</span>{remain > 0 ? <span className="prog-remain">— あと{remain}人</span> : <span className="ready">準備完了</span>}</span>
+          </div>
+          <div className="spacer" />
+          {teams && !showOverlay && (
+            <button type="button" className="btn-primary" onClick={() => setShowOverlay(true)}>
+              チーム表示
+            </button>
+          )}
+          {candidates && !teams && !showModePicker && (
+            <button type="button" className="btn-primary" onClick={() => setShowModePicker(true)}>
+              分け方を選ぶ
+            </button>
+          )}
+        </div>
+      </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
         .lobby-bar{border-bottom:1px solid var(--line);background:var(--bg-1)}

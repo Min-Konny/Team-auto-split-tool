@@ -1,95 +1,41 @@
-import { Box, Flex, HStack, Link as CLink, Text } from '@chakra-ui/react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import { useCommunity } from '@/lib/useCommunity'
 
-const navItem = {
-  px: { base: 2, md: 3.5 },
-  py: 1.5,
-  borderRadius: '999px',
-  color: 'var(--fg-1)',
-  fontSize: '13px',
-  textDecoration: 'none',
-  _hover: { bg: 'var(--bg-2)', color: 'var(--fg-0)' },
-}
+const links = [
+  { href:'/community', label:'コミュ' },
+  { href:'/players', label:'プレイヤー' },
+  { href:'/players/new', label:'登録' },
+  { href:'/matches', label:'試合履歴' },
+  { href:'/team-maker', label:'チーム作成' },
+]
 
 export default function Header() {
   const { community, loading, refresh } = useCommunity()
   const router = useRouter()
-
   const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' })
+    await fetch('/api/auth/logout', { method:'POST', credentials:'include' })
     refresh()
     router.push('/community/join')
   }
-
   return (
-    <Box
-      position="sticky"
-      top={0}
-      zIndex={50}
-      backdropFilter="blur(18px)"
-      bg="color-mix(in oklch, var(--bg-0) 85%, transparent)"
-      borderBottom="1px solid"
-      borderColor="var(--line)"
-    >
-      <Flex maxW="1440px" mx="auto" px={{ base: 3, md: 7 }} py="12px" gap={2} wrap="wrap" align="center" justify="space-between">
-        <CLink as={Link} href="/" display="flex" alignItems="center" gap={2.5} _hover={{ textDecoration: 'none' }}>
-          <Box w="26px" h="26px" position="relative">
-            <Box
-              position="absolute"
-              inset={0}
-              borderRadius="3px"
-              bg="linear-gradient(135deg, var(--blue), var(--blue-d))"
-              sx={{ clipPath: 'polygon(0 0,100% 0,100% 100%,50% 100%,0 50%)' }}
-            />
-            <Box
-              position="absolute"
-              inset={0}
-              borderRadius="3px"
-              bg="linear-gradient(135deg, var(--red-d), var(--red))"
-              sx={{ clipPath: 'polygon(50% 100%,100% 100%,100% 50%)' }}
-            />
-          </Box>
-          <Text fontFamily="var(--font-display), sans-serif" fontWeight={600} fontSize="15px" color="var(--fg-0)">
-            Team Maker
-            <Text as="span" ml={1} fontFamily="var(--font-mono), monospace" fontSize="10px" color="var(--fg-3)" letterSpacing="0.12em" textTransform="uppercase">
-              / LoL
-            </Text>
-          </Text>
-        </CLink>
-
-        <HStack as="nav" aria-label="メインナビゲーション" spacing={1} flexWrap="wrap">
-          <CLink as={Link} href="/community" sx={navItem}>{'\u30b3\u30df\u30e5'}</CLink>
-          <CLink as={Link} href="/players" sx={navItem}>{'\u30d7\u30ec\u30a4\u30e4\u30fc'}</CLink>
-          <CLink as={Link} href="/players/new" sx={navItem}>{'\u767b\u9332'}</CLink>
-          <CLink as={Link} href="/matches" sx={navItem}>{'\u8a66\u5408\u5c65\u6b74'}</CLink>
-          <CLink as={Link} href="/team-maker" sx={{ ...navItem, bg: 'var(--fg-0)', color: 'var(--bg-0)', ml: 2, _hover: { bg: 'var(--fg-1)' } }}>
-            {'\u30c1\u30fc\u30e0\u4f5c\u6210'} {'\u2192'}
-          </CLink>
-          {!loading && community && (
-            <>
-              <Text display={{ base: 'none', lg: 'block' }} px={2} fontSize="12px" color="var(--fg-3)" whiteSpace="nowrap">
-                {community.name}
-              </Text>
-              <Box
-                as="button"
-                type="button"
-                onClick={logout}
-                sx={{
-                  ...navItem,
-                  border: '1px solid var(--line)',
-                  bg: 'transparent',
-                  cursor: 'pointer',
-                  _hover: { bg: 'var(--bg-2)', color: 'var(--fg-0)' },
-                }}
-              >
-                ログアウト
-              </Box>
-            </>
-          )}
-        </HStack>
-      </Flex>
-    </Box>
+    <header className="site-header">
+      <div className="site-header-inner">
+        <Link href="/" className="site-brand" aria-label="LoL Team Maker ホーム">
+          <svg viewBox="0 0 40 44" fill="none" aria-hidden="true"><path d="M20 2 37 11v22L20 42 3 33V11Z" stroke="currentColor" strokeWidth="1.4"/><path d="M13 12h5v20h12v4H13Z" fill="currentColor"/><path d="M22 9h6v16h-6z" fill="currentColor" opacity=".45"/></svg>
+          <span>LoL <strong>TEAM MAKER</strong></span>
+        </Link>
+        <nav className="site-nav" aria-label="メインナビゲーション">
+          {links.map(({href,label}) => {
+            const active = href === '/players' ? router.pathname === href : router.pathname.startsWith(href)
+            return <Link key={href} href={href} className={active ? 'active' : ''} aria-current={active ? 'page' : undefined}>{label}</Link>
+          })}
+        </nav>
+        {!loading && community && <details className="site-account">
+          <summary>{community.name}<span aria-hidden="true">⌄</span></summary>
+          <div><Link href="/community">コミュニティ</Link><button type="button" onClick={logout}>ログアウト</button></div>
+        </details>}
+      </div>
+    </header>
   )
 }

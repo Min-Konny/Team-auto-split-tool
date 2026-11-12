@@ -2,6 +2,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/router'
 import Header from '@/components/Header'
+import RoleBadge from '@/components/RoleBadge'
+import { ROLE_TIER_LABEL } from '@/lib/roleTier'
 import RoleTierGrid from '@/components/RoleTierGrid'
 import { addMember } from '@/lib/members'
 import { defaultRoleMap, getMainRoleFromMap, validateRoleMap } from '@/lib/roleTier'
@@ -105,14 +107,14 @@ export default function NewPlayerPage() {
 
           <form onSubmit={handleSubmit}>
             <section className="fsec">
-              <label className="fsec-lbl">サモナーネーム *</label>
-              <input className="form-input" placeholder="FAKER#JP1" value={name} onChange={(e) => { setName(e.target.value); setErrors((p) => ({ ...p, name: undefined })) }} />
+              <label className="fsec-lbl" htmlFor="summoner-name">サモナーネーム *</label>
+              <input id="summoner-name" required className="form-input" placeholder="Konny#JP1" value={name} onChange={(e) => { setName(e.target.value); setErrors((p) => ({ ...p, name: undefined })) }} />
               {errors.name && <div className="err-msg">{errors.name}</div>}
             </section>
 
             <section className="fsec">
-              <label className="fsec-lbl">ニックネーム</label>
-              <input className="form-input" placeholder="こにー" value={nick} onChange={(e) => setNick(e.target.value)} />
+              <label className="fsec-lbl" htmlFor="nickname">ニックネーム</label>
+              <input id="nickname" className="form-input" placeholder="こにー" value={nick} onChange={(e) => setNick(e.target.value)} />
               <div className="form-hint">設定するとリストや選択画面で優先表示されます</div>
             </section>
 
@@ -123,15 +125,11 @@ export default function NewPlayerPage() {
             </section>
 
             <section className="fsec">
-              <label className="fsec-lbl">ランク</label>
-              <div className="rank-list">
-                {(Object.keys(RANK_RATES) as Rank[]).map((r) => (
-                  <div key={r} className={`rank-row${rank === r ? ' selected' : ''}`} onClick={() => setRank(r)}>
-                    <span className="rank-name" style={{ color: RANK_COLORS[r] }}>{r}</span>
-                    <span className="rank-rates-hint">M:{RANK_RATES[r].main} / S:{RANK_RATES[r].sub}</span>
-                  </div>
-                ))}
-              </div>
+              <label className="fsec-lbl" htmlFor="player-rank">ランク</label>
+              <select id="player-rank" className="form-input" value={rank} onChange={(event) => setRank(event.target.value as Rank)}>
+                {(Object.keys(RANK_RATES) as Rank[]).map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+              <p className="form-hint">初期ELO {rates.main} · サブロール {rates.sub}</p>
             </section>
 
             <button className="submit-btn" type="submit" disabled={!canSubmit || !community}>登録する</button>
@@ -152,6 +150,9 @@ export default function NewPlayerPage() {
                     <div className="pv-rate-v">{rates.main}</div>
                     <div className="pv-rank" style={{ color: RANK_COLORS[getRankFromRate(rates.main)] }}>{getRankFromRate(rates.main)}</div>
                   </div>
+                </div>
+                <div className="preview-roles" aria-label="ロール適性プレビュー">
+                  {ROLES.map((role) => <span key={role}><RoleBadge role={role} sm /><b>{ROLE_TIER_LABEL[roles[role]]}</b></span>)}
                 </div>
               </>
             ) : (
